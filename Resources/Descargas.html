@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Descargas</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --accent: #7c3aed;
+    --bg: #0d0d14;
+    --surface: #13131f;
+    --surface2: #1a1a2e;
+    --border: rgba(124,58,237,0.2);
+    --text: rgba(255,255,255,0.85);
+    --muted: rgba(255,255,255,0.35);
+  }
+  body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+  #main { max-width: 860px; padding: 40px; }
+  #header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 32px; }
+  #header h2 { font-size: 22px; font-weight: 300; color: white; }
+  #header h2 span { color: var(--accent); }
+  .header-btns { display: flex; gap: 10px; align-items: center; }
+  .btn {
+    background: rgba(124,58,237,0.1); border: 1px solid var(--border);
+    color: var(--accent); padding: 8px 16px; border-radius: 4px; cursor: pointer;
+    font-size: 12px; font-family: 'Segoe UI', sans-serif; letter-spacing: 0.05em;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: rgba(124,58,237,0.2); }
+  .btn-muted { color: var(--muted); border-color: rgba(255,255,255,0.1); background: rgba(255,255,255,0.04); }
+  .btn-muted:hover { background: rgba(255,255,255,0.08); }
+
+  #carpeta-row {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 10px 16px; margin-bottom: 28px;
+    position: relative;
+  }
+  #carpeta-row::before {
+    content: ''; position: absolute; left: 0; top: 0;
+    width: 3px; height: 100%; background: var(--accent); border-radius: 6px 0 0 6px;
+  }
+  #carpeta-icon { font-size: 18px; }
+  #carpeta-path { flex: 1; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  
+  .section-label {
+    font-size: 10px; color: var(--accent); text-transform: uppercase;
+    letter-spacing: 0.1em; margin-bottom: 12px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .descarga-item {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 14px; border-radius: 8px;
+    border: 1px solid transparent; margin-bottom: 6px;
+    transition: all 0.15s; background: var(--surface);
+    border-color: var(--border);
+  }
+  .descarga-item:hover { border-color: rgba(124,58,237,0.35); }
+
+  .descarga-icon { font-size: 22px; flex-shrink: 0; width: 32px; text-align: center; }
+
+  .descarga-info { flex: 1; overflow: hidden; }
+  .descarga-nombre {
+    font-size: 13px; color: var(--text);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .descarga-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .progress-bar-bg {
+    height: 3px; background: rgba(255,255,255,0.06);
+    border-radius: 2px; margin-top: 6px; overflow: hidden;
+  }
+  .progress-bar-fg {
+    height: 3px; background: var(--accent);
+    border-radius: 2px; transition: width 0.3s;
+  }
+
+  .descarga-estado {
+    font-size: 11px; padding: 3px 8px; border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .estado-completado { background: rgba(74,222,128,0.1); color: #4ade80; }
+  .estado-descargando { background: rgba(124,58,237,0.1); color: var(--accent); }
+  .estado-cancelado { background: rgba(255,255,255,0.06); color: var(--muted); }
+  .estado-error { background: rgba(255,60,60,0.1); color: #ff6060; }
+
+  .btn-abrir {
+    background: transparent; border: none; font-size: 16px;
+    cursor: pointer; padding: 4px; border-radius: 4px;
+    color: var(--muted); transition: color 0.15s; flex-shrink: 0;
+  }
+  .btn-abrir:hover { color: var(--accent); }
+
+  #empty { text-align: center; color: var(--muted); font-size: 14px; margin-top: 80px; }
+  #empty p { margin-top: 8px; font-size: 12px; }
+
+  body { display: flex; }
+  #sidebar {
+    width: 240px; min-width: 240px; height: 100vh; position: sticky; top: 0;
+    background: #0a0a10; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow-y: auto;
+  }
+  #sidebar-header { padding: 20px 16px 12px; border-bottom: 1px solid var(--border); }
+  #accent-bar { width: 32px; height: 2px; background: var(--accent); border-radius: 2px; margin-bottom: 8px; }
+  #sidebar-header h1 { font-size: 15px; font-weight: 700; color: white; letter-spacing: 0.05em; text-transform: uppercase; }
+  #sidebar-header p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .sb-section { padding: 16px 8px 4px; }
+  .sb-section-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; padding: 0 8px; margin-bottom: 4px; }
+  .sb-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 13px; color: var(--muted); transition: all 0.15s;
+    border: 1px solid transparent; text-decoration: none; position: relative;
+  }
+  .sb-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+  .sb-item.active { background: rgba(255,255,255,0.06); border-color: var(--border); color: white; }
+  .sb-item.active::before { content: ''; position: absolute; left: 0; top: 20%; bottom: 20%; width: 2px; border-radius: 2px; background: var(--accent); }
+  .sb-icon { width: 18px; text-align: center; font-size: 14px; opacity: 0.7; flex-shrink: 0; }
+  .sb-item.active .sb-icon { opacity: 1; }
+  #sidebar-footer { margin-top: auto; padding: 12px 16px; border-top: 1px solid var(--border); }
+  #sidebar-footer p { font-size: 10px; color: var(--muted); }
+  #main { flex: 1; overflow-y: auto; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <div id="accent-bar"></div>
+    <h1>AtsukiBrowser</h1>
+    <p>v1.0.0</p>
+  </div>
+  <div class="sb-section">
+    <div class="sb-section-label">Herramientas</div>
+    <a class="sb-item" onclick="window.chrome.webview.postMessage('navigate:favoritos'); return false;" href="#">
+      <span class="sb-icon">⭐</span> Favoritos
+    </a>
+    <a class="sb-item" onclick="window.chrome.webview.postMessage('navigate:historial'); return false;" href="#">
+      <span class="sb-icon">🕐</span> Historial
+    </a>
+    <a class="sb-item active" href="#"><span class="sb-icon">📥</span> Descargas</a>
+    <a class="sb-item" id="sb-perfiles" href="#">
+      <span class="sb-icon">👤</span> Perfiles
+    </a>
+  </div>
+  <div class="sb-section">
+    <div class="sb-section-label">Ajustes</div>
+    <a class="sb-item" onclick="window.chrome.webview.postMessage('navigate:ajustes'); return false;" href="#">
+      <span class="sb-icon">🎨</span> Apariencia
+    </a>
+  </div>
+  <div id="sidebar-footer"><p>AtsukiBrowser · v1.0.0</p></div>
+</div>
+
+<div id="main">
+  <div id="header">
+    <h2>Mis <span>descargas</span></h2>
+    <div class="header-btns">
+      <button class="btn btn-muted" id="btn-carpeta">📂 Cambiar carpeta</button>
+      <button class="btn" id="btn-limpiar">Limpiar historial</button>
+    </div>
+  </div>
+
+  <div id="carpeta-row">
+    <span id="carpeta-icon">📁</span>
+    <span id="carpeta-path">Cargando...</span>
+  </div>
+
+  <div id="activas-section" style="display:none">
+    <div class="section-label">Activas</div>
+    <div id="lista-activas"></div>
+    <div style="height:24px"></div>
+  </div>
+
+  <div class="section-label">Historial</div>
+  <div id="lista-historial"></div>
+</div>
+
+<script>
+  let datos = { historial: [], activas: [], carpeta: '' };
+
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw === 'string' && raw.startsWith('descargas:')) {
+      datos = JSON.parse(raw.slice('descargas:'.length));
+      renderizar();
+    }
+  });
+
+  function cargar() {
+    window.chrome.webview.postMessage('get:descargas');
+  }
+
+  function iconPorNombre(nombre) {
+    const ext = nombre.split('.').pop().toLowerCase();
+    if (['mp4','mkv','avi','mov','webm'].includes(ext)) return '🎬';
+    if (['mp3','flac','wav','ogg','aac'].includes(ext)) return '🎵';
+    if (['jpg','jpeg','png','gif','webp','svg'].includes(ext)) return '🖼️';
+    if (['zip','rar','7z','tar','gz'].includes(ext)) return '🗜️';
+    if (['pdf'].includes(ext)) return '📄';
+    if (['exe','msi','dmg'].includes(ext)) return '⚙️';
+    return '📥';
+  }
+
+  function renderItem(d, contenedor) {
+    const div = document.createElement('div');
+    div.className = 'descarga-item';
+
+    const progreso = d.Total > 0 ? Math.round(d.Recibido * 100 / d.Total) : d.Progreso ?? 0;
+    const tamano = d.TamañoStr ?? '';
+    const estadoClass = `estado-${d.Estado}`;
+
+    div.innerHTML = `
+      <div class="descarga-icon">${iconPorNombre(d.Nombre)}</div>
+      <div class="descarga-info">
+        <div class="descarga-nombre">${d.Nombre}</div>
+        <div class="descarga-meta">${d.Estado === 'descargando' ? `${progreso}% · ${tamano}` : tamano}</div>
+        ${d.Estado === 'descargando' && d.Total > 0 ? `
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fg" style="width:${progreso}%"></div>
+          </div>` : ''}
+      </div>
+      <span class="descarga-estado ${estadoClass}">${
+        d.Estado === 'completado' ? '✓ Listo' :
+        d.Estado === 'descargando' ? '⬇ Descargando' :
+        d.Estado === 'cancelado' ? '✕ Cancelado' : d.Estado
+      }</span>
+      ${d.Estado === 'completado' ? `<button class="btn-abrir" title="Abrir ubicación">📂</button>` : ''}
+    `;
+
+    if (d.Estado === 'completado') {
+      div.querySelector('.btn-abrir').addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        window.chrome.webview.postMessage('descargas:abrir:' + d.Ruta);
+      });
+      div.addEventListener('click', () =>
+        window.chrome.webview.postMessage('descargas:abrir:' + d.Ruta));
+    }
+
+    contenedor.appendChild(div);
+  }
+
+  function renderizar() {
+    document.getElementById('carpeta-path').textContent = datos.carpeta || 'No configurada';
+
+    // Activas
+    const activasSection = document.getElementById('activas-section');
+    const listaActivas = document.getElementById('lista-activas');
+    listaActivas.innerHTML = '';
+    if (datos.activas.length > 0) {
+      activasSection.style.display = 'block';
+      datos.activas.forEach(d => renderItem(d, listaActivas));
+    } else {
+      activasSection.style.display = 'none';
+    }
+
+    // Historial
+    const listaHistorial = document.getElementById('lista-historial');
+    listaHistorial.innerHTML = '';
+    if (datos.historial.length === 0 && datos.activas.length === 0) {
+      listaHistorial.innerHTML = '<div id="empty">📥<p>No hay descargas todavía.</p></div>';
+    } else {
+      datos.historial.forEach(d => renderItem(d, listaHistorial));
+    }
+  }
+
+  document.getElementById('btn-carpeta').addEventListener('click', () => {
+    window.chrome.webview.postMessage('descargas:carpeta:elegir');
+  });
+
+  document.getElementById('btn-limpiar').addEventListener('click', () => {
+    if (confirm('¿Limpiar el historial de descargas?'))
+      window.chrome.webview.postMessage('descargas:limpiar');
+  });
+
+  cargar();
+
+  // Refresco automático para descargas activas
+  setInterval(() => {
+    if (datos.activas.length > 0)
+      window.chrome.webview.postMessage('get:descargas');
+  }, 1000);
+
+  function hexToRgba(hex, alpha) {
+    hex = hex.replace('#','');
+    const r = parseInt(hex.slice(0,2),16);
+    const g = parseInt(hex.slice(2,4),16);
+    const b = parseInt(hex.slice(4,6),16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  function aplicarTema(t) {
+    const root = document.documentElement;
+    root.style.setProperty('--accent',   t.Accent   ?? t.accent);
+    root.style.setProperty('--bg',       t.Bg       ?? t.bg);
+    root.style.setProperty('--surface',  t.Surface  ?? t.surface);
+    root.style.setProperty('--surface2', t.Surface2 ?? t.surface2);
+    root.style.setProperty('--border',   hexToRgba(t.Accent ?? t.accent, 0.25));
+  }
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw === 'string' && raw.startsWith('tema:'))
+      aplicarTema(JSON.parse(raw.slice('tema:'.length)));
+  });
+
+  document.getElementById('sb-perfiles')?.addEventListener('click', e => {
+    e.preventDefault();
+    window.chrome.webview.postMessage('perfiles');
+  });
+  window.chrome.webview.postMessage('get:tema');
+</script>
+</body>
+</html>

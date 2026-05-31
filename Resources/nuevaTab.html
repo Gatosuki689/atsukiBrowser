@@ -1,0 +1,2069 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Nueva pestaña</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --accent: #7c3aed;
+    --accent2: #a78bfa;
+    --bg: #0d0d14;
+    --surface: #13131f;
+    --surface2: #1a1a2e;
+    --border: rgba(124,58,237,0.2);
+    --text: rgba(255,255,255,0.85);
+    --muted: rgba(255,255,255,0.35);
+  }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow-y: auto;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      repeating-linear-gradient(90deg, transparent, transparent 80px,
+        rgba(124,58,237,0.02) 80px, rgba(124,58,237,0.02) 81px),
+      repeating-linear-gradient(180deg, transparent, transparent 80px,
+        rgba(124,58,237,0.02) 80px, rgba(124,58,237,0.02) 81px);
+    pointer-events: none; z-index: 0;
+  }
+
+  #bg-image {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0.35;
+  pointer-events: none;
+  display: none;
+  }
+
+  body.has-bg #bg-image { display: block; }
+  body.has-bg::before { opacity: 0.3; }
+
+  #wave {
+    position: fixed; bottom: 0; left: 0;
+    width: 100%; pointer-events: none; z-index: 0;
+  }
+
+  #main {
+    display: flex; flex-direction: column;
+    align-items: center;
+    gap: 20px; z-index: 1;
+    padding: 32px 24px;
+    width: 100%;
+  }
+
+  /* ── Reloj ── */
+  #clock-wrap {
+    text-align: center;
+    position: relative;
+  }
+  #clock {
+    font-size: 86px; font-weight: 200;
+    letter-spacing: -5px; color: white;
+    line-height: 1; text-shadow: 0 0 60px rgba(124,58,237,0.2);
+  }
+  #clock span { color: var(--accent); }
+  #date {
+    font-size: 13px; color: var(--muted);
+    letter-spacing: 0.08em; margin-top: 6px;
+    text-transform: uppercase;
+  }
+
+  /* ── Búsqueda ── */
+  #search-wrap {
+    width: 560px; display: flex; align-items: center;
+    background: rgba(19, 19, 31, var(--widget-opac, 0.75));
+    border: 1px solid var(--border);
+    border-radius: 6px; padding: 0 18px; height: 48px;
+    transition: border-color 0.2s, box-shadow 0.2s; position: relative;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  #search-wrap::before {
+    content: ''; position: absolute; left: 0; top: 0;
+    width: 3px; height: 100%; background: var(--accent);
+    border-radius: 6px 0 0 6px;
+  }
+  #search-wrap:focus-within {
+    border-color: rgba(124,58,237,0.5);
+    box-shadow: 0 0 24px rgba(124,58,237,0.12);
+  }
+  #search {
+    flex: 1; background: none; border: none; outline: none;
+    color: white; font-size: 14px;
+    font-family: 'Segoe UI', sans-serif; margin-left: 10px;
+  }
+  #search::placeholder { color: var(--muted); }
+  #search-engine {
+    font-size: 11px; color: var(--accent);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    opacity: 0.8; font-weight: 600;
+  }
+
+  /* ── Dials ── */
+  #dials-wrap { text-align: center; }
+  #dials-label {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px;
+  }
+  #dials { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+
+  .dial {
+    display: flex; flex-direction: column;
+    align-items: center; gap: 10px;
+    cursor: pointer; transition: transform 0.2s;
+    text-decoration: none; position: relative;
+    width: 100px;
+  }
+  .dial:hover { transform: translateY(-6px); }
+
+  .dial-card {
+    width: 100px; height: 68px;
+    border-radius: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    overflow: hidden;
+    position: relative;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .dial-card-bg {
+    position: absolute; inset: 0;
+    background-size: cover; background-position: center top;
+    opacity: 0.35;
+    transition: opacity 0.2s;
+  }
+
+  .dial-card-favicon {
+    width: 32px; height: 32px;
+    object-fit: contain;
+    position: relative; z-index: 1;
+    border-radius: 8px;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+  }
+
+  .dial-card-emoji {
+    font-size: 28px;
+    position: relative; z-index: 1;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+  }
+
+  .dial:hover .dial-card {
+    border-color: rgba(124,58,237,0.6);
+    box-shadow: 0 8px 28px rgba(124,58,237,0.2);
+  }
+  .dial:hover .dial-card-bg { opacity: 0.55; }
+
+  .dial span {
+    font-size: 12px; color: var(--text);
+    letter-spacing: 0.02em;
+    max-width: 120px; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+    text-align: center;
+  }
+
+  .dial-add .dial-card {
+    background: transparent;
+    border: 1px dashed rgba(124,58,237,0.4);
+    color: var(--muted); font-size: 28px;
+  }
+  .dial-add:hover .dial-card {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(124,58,237,0.05);
+  }
+
+  /* ── Widgets ── */
+  #widgets-wrap {
+    display: flex;
+    gap: 14px;
+    width: 100%;
+    max-width: 900px;
+    padding: 0 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .widget {
+    background: rgba(19, 19, 31, var(--widget-opac, 0.75));
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    flex: 1 1 180px;
+    min-width: 160px;
+    max-width: 220px;
+    min-height: 120px;
+    max-height: 160px;
+    overflow: hidden;
+    position: relative;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .widget-alto {
+      max-height: 260px;
+      min-height: 200px;
+  }
+
+  .widget::before {
+    content: ''; position: absolute;
+    left: 0; top: 0; width: 3px; height: 100%;
+    background: var(--accent); border-radius: 12px 0 0 12px;
+  }
+  .widget-title {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 10px;
+  }
+
+  /* Clima */
+  #w-clima-body { display: flex; align-items: center; gap: 12px; }
+  #w-clima-icon { font-size: 36px; line-height: 1; }
+  #w-clima-temp { font-size: 28px; font-weight: 200; color: white; }
+  #w-clima-desc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .clima-msg { font-size: 12px; color: var(--muted); }
+
+  /* Notas */
+  #w-notas-input {
+    width: 100%; background: transparent; border: none;
+    outline: none; color: var(--text); font-size: 12px;
+    font-family: 'Segoe UI', sans-serif; resize: none;
+    height: 80px; line-height: 1.6;
+  }
+  #w-notas-input::placeholder { color: var(--muted); }
+  #w-notas-saved {
+    font-size: 10px; color: var(--muted);
+    margin-top: 6px; text-align: right;
+    opacity: 0; transition: opacity 0.3s;
+  }
+
+  /* Noticias */
+  #w-news-list { display: flex; flex-direction: column; gap: 8px; }
+  .news-item {
+    cursor: pointer; padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .news-item:last-child { border-bottom: none; }
+  .news-title {
+    font-size: 12px; color: var(--text);
+    line-height: 1.4; transition: color 0.15s;
+    display: -webkit-box; -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .news-item:hover .news-title { color: var(--accent); }
+  .news-source { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .news-msg { font-size: 12px; color: var(--muted); }
+
+  /* Rendimiento */
+  #w-perf-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .perf-item { display: flex; flex-direction: column; gap: 6px; }
+  .perf-label {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    display: flex; justify-content: space-between;
+  }
+  .perf-label span { color: var(--text); font-weight: 500; }
+  .perf-bar {
+    height: 4px; background: rgba(255,255,255,0.08);
+    border-radius: 2px; overflow: hidden;
+  }
+  .perf-fill {
+    height: 100%; border-radius: 2px;
+    background: var(--accent);
+    transition: width 0.6s ease;
+    width: 0%;
+  }
+  .perf-fill.warning { background: #f97316; }
+  .perf-fill.danger  { background: #ef4444; }
+
+  /* ── Modal ── */
+  #modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.6);
+    display: flex; align-items: center; justify-content: center;
+  }
+  #modal {
+    background: #1a1a2e; border: 1px solid rgba(124,58,237,0.4);
+    border-radius: 12px; padding: 24px; width: 340px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  #modal-title { font-size: 15px; font-weight: 500; color: white; }
+  .modal-field { display: flex; flex-direction: column; gap: 6px; }
+  .modal-field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .modal-field input {
+    background: #0d0d14; border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 6px; padding: 8px 12px; color: white;
+    font-size: 13px; font-family: 'Segoe UI', sans-serif; outline: none;
+  }
+  .modal-field input:focus { border-color: var(--accent); }
+  #modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  #modal-cancel {
+    background: transparent; border: 1px solid rgba(255,255,255,0.1);
+    color: var(--muted); padding: 7px 16px; border-radius: 6px;
+    cursor: pointer; font-size: 12px; font-family: 'Segoe UI', sans-serif;
+  }
+  #modal-save {
+    background: var(--accent); border: none; color: white;
+    padding: 7px 16px; border-radius: 6px; cursor: pointer;
+    font-size: 12px; font-family: 'Segoe UI', sans-serif;
+  }
+  #modal-save:hover { opacity: 0.85; }
+
+  /* ── Ctx menu ── */
+  #ctx-menu {
+    position: fixed; z-index: 200;
+    background: #1a1a2e; border: 1px solid rgba(124,58,237,0.3);
+    border-radius: 8px; padding: 4px; min-width: 140px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  }
+  .ctx-item {
+    padding: 8px 14px; font-size: 12px; color: var(--text);
+    cursor: pointer; border-radius: 4px;
+  }
+  .ctx-item:hover { background: rgba(124,58,237,0.15); }
+  .ctx-danger { color: #ff6b8a; }
+  .ctx-danger:hover { background: rgba(255,51,102,0.1); }
+
+  /* ── Menú personalización ── */
+  #customize-btn {
+    position: fixed; bottom: 20px; right: 20px;
+    z-index: 10; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 50%;
+    color: var(--muted); font-size: 16px;
+    width: 40px; height: 40px; cursor: pointer;
+    transition: all 0.2s; display: flex;
+    align-items: center; justify-content: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  #customize-btn:hover {
+    border-color: var(--accent); color: var(--accent);
+    background: rgba(124,58,237,0.1);
+    transform: rotate(15deg);
+  }
+  #customize-panel {
+    position: fixed; bottom: 70px; right: 20px;
+    z-index: 50; width: 280px;
+    background: var(--surface);
+    border: 1px solid var(--border); border-radius: 16px;
+    overflow: hidden;
+    display: none; flex-direction: column;
+    backdrop-filter: blur(16px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    transform: translateY(10px);
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+  }
+  #customize-panel.open {
+    display: flex; opacity: 1; transform: translateY(0);
+  }
+  .cp-header {
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 12px; font-weight: 600;
+    color: var(--text); letter-spacing: 0.05em;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .cp-close {
+    background: none; border: none; color: var(--muted);
+    font-size: 16px; cursor: pointer; padding: 0 2px;
+  }
+  .cp-close:hover { color: var(--text); }
+  .cp-section {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .cp-section:last-child { border-bottom: none; }
+  .cp-section-title {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: 10px;
+  }
+  .cp-row {
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 10px;
+    font-size: 12px; color: var(--text);
+    padding: 4px 0;
+  }
+  .cp-btn {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text);
+    font-size: 11px; font-family: 'Segoe UI', sans-serif;
+    padding: 5px 10px; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .cp-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .cp-btn.danger:hover { border-color: #ef4444; color: #ef4444; }
+  .cp-slider {
+    width: 100%; accent-color: var(--accent);
+    height: 3px; cursor: pointer; margin-top: 6px;
+  }
+  .cp-toggle {
+    width: 36px; height: 20px; border-radius: 10px;
+    background: rgba(255,255,255,0.1); border: none;
+    cursor: pointer; position: relative;
+    transition: background 0.2s; flex-shrink: 0;
+  }
+  .cp-toggle.on { background: var(--accent); }
+  .cp-toggle::after {
+    content: ''; position: absolute;
+    width: 14px; height: 14px; border-radius: 50%;
+    background: white; top: 3px; left: 3px;
+    transition: left 0.2s;
+  }
+  .cp-toggle.on::after { left: 19px; }
+  .cp-opac-label {
+    font-size: 10px; color: var(--muted);
+    display: flex; justify-content: space-between;
+    margin-top: 8px;
+  }
+
+  /* Pomodoro */
+  #w-pomodoro-body { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  #w-pomodoro-time {
+    font-size: 32px; font-weight: 200; color: white;
+    letter-spacing: -1px; line-height: 1;
+  }
+  #w-pomodoro-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  #w-pomodoro-controls { display: flex; gap: 8px; margin-top: 4px; }
+  .pomo-btn {
+    background: rgba(255,255,255,0.06); border: 1px solid var(--border);
+    border-radius: 4px; color: var(--text); font-size: 11px;
+    padding: 4px 10px; cursor: pointer; transition: background 0.15s;
+    font-family: 'Segoe UI', sans-serif;
+  }
+  .pomo-btn:hover { background: rgba(255,255,255,0.1); }
+  .pomo-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+  #w-pomodoro-modes { display: flex; gap: 6px; }
+  .pomo-mode {
+    font-size: 10px; color: var(--muted); cursor: pointer;
+    padding: 2px 8px; border-radius: 3px; transition: all 0.15s;
+  }
+  .pomo-mode.active { color: var(--accent); background: rgba(124,58,237,0.1); }
+
+  /* Calendario / Tareas */
+  #w-tareas-body { display: flex; flex-direction: column; gap: 6px; }
+  #w-tareas-list { display: flex; flex-direction: column; gap: 4px; max-height: 80px; overflow-y: auto; }
+  .tarea-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 3px 0; cursor: pointer;
+  }
+  .tarea-check {
+    width: 14px; height: 14px; border-radius: 3px;
+    border: 1px solid var(--border); flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+  .tarea-item.done .tarea-check {
+    background: var(--accent); border-color: var(--accent);
+  }
+  .tarea-item.done .tarea-check::after { content: '✓'; font-size: 9px; color: white; }
+  .tarea-text {
+    font-size: 12px; color: var(--text); flex: 1;
+    transition: all 0.15s;
+  }
+  .tarea-item.done .tarea-text { color: var(--muted); text-decoration: line-through; }
+  .tarea-del {
+    font-size: 11px; color: var(--muted); opacity: 0;
+    background: none; border: none; cursor: pointer;
+    transition: opacity 0.15s; padding: 0 2px;
+  }
+  .tarea-item:hover .tarea-del { opacity: 1; }
+  #w-tareas-input-wrap {
+    display: flex; gap: 6px; margin-top: 4px;
+  }
+  #w-tareas-input {
+    flex: 1; background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 4px 8px; color: var(--text); font-size: 12px;
+    font-family: 'Segoe UI', sans-serif; outline: none;
+  }
+  #w-tareas-input::placeholder { color: var(--muted); }
+  #w-tareas-add {
+    background: var(--accent); border: none; border-radius: 4px;
+    color: white; font-size: 14px; width: 24px; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  #w-tareas-add:hover { opacity: 0.85; }
+
+  /* Música */
+  #w-musica {
+    position: relative;
+    overflow: hidden;
+    min-height: 140px;
+    max-height: 200px;
+    padding: 0;
+  }
+
+  #musica-bg {
+    position: absolute; inset: 0;
+    background-size: cover;
+    background-position: center;
+    filter: blur(20px) brightness(0.3);
+    transform: scale(1.2);
+    transition: background-image 0.6s ease;
+    z-index: 0;
+  }
+
+  #musica-content {
+    position: relative; z-index: 1;
+    display: flex; flex-direction: column;
+    height: 100%; padding: 14px 16px; gap: 8px;
+  }
+
+  #musica-widget-title {
+    font-size: 10px; color: rgba(255,255,255,0.5);
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+
+  #musica-empty-msg {
+    font-size: 12px; color: rgba(255,255,255,0.3);
+    margin-top: 8px;
+  }
+
+  #musica-player-inner {
+    display: none; flex-direction: column; gap: 8px;
+  }
+
+  #musica-top-row {
+    display: flex; gap: 10px; align-items: center;
+  }
+
+  #musica-img {
+    width: 52px; height: 52px; border-radius: 8px;
+    object-fit: cover; flex-shrink: 0;
+    background: rgba(255,255,255,0.05);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    transition: opacity 0.3s;
+  }
+
+  #musica-img.playing {
+    animation: musicPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes musicPulse {
+    0%, 100% { box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+    50%       { box-shadow: 0 4px 20px rgba(124,58,237,0.4); }
+  }
+
+  #musica-meta { flex: 1; min-width: 0; }
+
+  #w-musica-titulo {
+    font-size: 13px; font-weight: 500; color: white;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  #w-musica-artista {
+    font-size: 11px; color: rgba(255,255,255,0.55);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 2px;
+  }
+
+  #musica-fuente {
+    font-size: 10px; color: rgba(255,255,255,0.3);
+    margin-top: 3px;
+  }
+
+  #musica-progress-wrap {
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  #musica-progress-bg {
+    flex: 1;
+    height: 3px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+    cursor: pointer;
+    position: relative;
+  }
+
+  #w-musica-progress-bar {
+    position: absolute;
+    top: 0; left: 0;
+    height: 3px;
+    width: 0%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.5s ease;
+  }
+
+  #musica-controles {
+    display: flex; gap: 6px; align-items: center;
+    justify-content: center;
+  }
+
+  .musica-btn {
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 6px; color: white; font-size: 12px;
+    width: 28px; height: 26px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .musica-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(124,58,237,0.1);
+  }
+
+  #musica-play {
+    width: 34px; height: 30px; font-size: 14px;
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  #musica-play:hover {
+    opacity: 0.85; color: white;
+    border-color: var(--accent);
+  }
+
+  #search-suggestions {
+    display: none;
+    position: fixed;
+    background: rgba(13, 13, 25, 0.96);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    z-index: 99999;
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+
+  .sug-item {
+    padding: 11px 20px;
+    font-size: 13px;
+    color: rgba(255,255,255,0.75);
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .sug-item:last-child { border-bottom: none; }
+  .sug-item::before {
+    content: '🔍';
+    font-size: 11px;
+    opacity: 0.35;
+    flex-shrink: 0;
+  }
+  .sug-item:hover {
+    background: rgba(124,58,237,0.12);
+    color: white;
+  }
+
+  .prf-item {
+    display:flex; align-items:center; gap:10px;
+    padding:8px 16px; font-size:12px; color:rgba(255,255,255,0.65);
+    cursor:pointer; transition:background 0.15s;
+  }
+  .prf-item:hover { background:rgba(255,255,255,0.06); color:white; }
+  .prf-perfil-item {
+    display:flex; align-items:center; gap:10px;
+    padding:8px 16px; font-size:12px; color:rgba(255,255,255,0.65);
+    cursor:pointer; transition:background 0.15s; position:relative;
+  }
+  .prf-perfil-item:hover { background:rgba(255,255,255,0.06); color:white; }
+  .prf-perfil-item.activo { color:white; }
+  .prf-perfil-item.activo::after {
+    content:'✓'; position:absolute; right:16px;
+    color:var(--accent,#7c3aed); font-size:12px;
+  }
+  #prf-lista::-webkit-scrollbar { width:4px; }
+  #prf-lista::-webkit-scrollbar-thumb {
+    background:rgba(124,58,237,0.4); border-radius:4px;
+  }
+
+  /* ── Pantalla invitado ── */
+  #invitado-screen {
+    display: none;
+    position: fixed; inset: 0;
+    background: var(--bg);
+    z-index: 50;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    text-align: center;
+    padding: 40px;
+  }
+  #invitado-screen.visible { display: flex; }
+
+  #invitado-icon {
+    font-size: 64px;
+    filter: grayscale(0.3);
+  }
+  #invitado-title {
+    font-size: 26px;
+    font-weight: 300;
+    color: white;
+  }
+  #invitado-desc {
+    font-size: 13px;
+    color: var(--muted);
+    max-width: 480px;
+    line-height: 1.7;
+  }
+  #invitado-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+  }
+  .invitado-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 20px;
+    font-size: 12px;
+    color: var(--muted);
+    width: 380px;
+  }
+  .invitado-item-icon { font-size: 18px; flex-shrink: 0; }
+
+  /* ── Splash text ── */
+  #splash {
+    font-size: 15px;
+    color: #ffff55;
+    opacity: 0.9;
+    font-style: italic;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-align: center;
+    cursor: default;
+    user-select: none;
+    position: absolute;
+    top: 18%;
+    left: 57%;
+    transform-origin: left center;
+    animation: splashPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both,
+           splashPulse 0.5s ease-in alternate infinite;
+    text-shadow: 0 0 12px currentColor;
+  }
+
+  @keyframes splashPop {
+    from { opacity: 0; transform: scale(0.5) rotate(-20deg); }
+    to   { opacity: 0.9; transform: scale(1) rotate(-20deg); }
+  }
+
+  @keyframes splashPulse {
+    0%, 100% { transform: scale(1)    rotate(-20deg); }
+    50%       { transform: scale(1.12) rotate(-20deg); }
+  }
+
+  #splash:hover {
+    opacity: 1;
+    color: #ffff55;
+    text-shadow: 0 0 20px #ffff55;
+    transition: all 0.15s;
+  }
+
+</style>
+</head>
+<body>
+  <div id="invitado-screen">
+    <div id="invitado-icon">🕶</div>
+    <div id="invitado-title">Estás navegando como invitado</div>
+    <div id="invitado-desc">
+      Las páginas que visites no se guardarán en el historial y los datos
+      de sesión se borrarán al cerrar. Las extensiones están desactivadas.
+    </div>
+    <div id="invitado-items">
+      <div class="invitado-item">
+        <span class="invitado-item-icon">🕐</span>
+        <span>El historial no se guardará</span>
+      </div>
+      <div class="invitado-item">
+        <span class="invitado-item-icon">🍪</span>
+        <span>Las cookies y datos de sesión se borrarán al salir</span>
+      </div>
+      <div class="invitado-item">
+        <span class="invitado-item-icon">🧩</span>
+        <span>Las extensiones están desactivadas en este modo</span>
+      </div>
+      <div class="invitado-item">
+        <span class="invitado-item-icon">⭐</span>
+        <span>Los favoritos no se guardarán</span>
+      </div>
+    </div>
+  </div>
+
+
+  <img id="bg-image" alt="" />
+  <div id="perfil-badge" style="
+    position: fixed; top: 14px; right: 16px; z-index: 10;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: rgba(13,13,20,0.7); backdrop-filter: blur(8px);
+    border: 2px solid rgba(124,58,237,0.35); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; overflow: hidden; transition: border-color 0.2s, transform 0.2s;
+    user-select: none;
+  " onmouseenter="this.style.borderColor='rgba(124,58,237,0.8)';this.style.transform='scale(1.05)'"
+    onmouseleave="this.style.borderColor='rgba(124,58,237,0.35)';this.style.transform='scale(1)'">
+  <div id="perfil-badge-avatar" style="
+    width:100%; height:100%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:24px; line-height:1; overflow:hidden;
+  ">👤</div>
+  </div>
+
+  <!-- Popup de perfil -->
+  <div id="prf-menu" style="
+      display:none; position:fixed; top:70px; right:16px; z-index:100;
+      width:220px; background:rgba(10,10,20,0.95); backdrop-filter:blur(20px);
+      border:1px solid rgba(124,58,237,0.35); border-radius:12px;
+      overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+      font-family:'Segoe UI',sans-serif;
+  ">
+    <!-- Header perfil activo -->
+    <div id="prf-menu-header" style="
+      padding:16px; display:flex; align-items:center; gap:12px;
+      border-bottom:1px solid rgba(255,255,255,0.06);
+    ">
+      <div id="prf-avatar" style="
+        width:40px; height:40px; border-radius:50%; flex-shrink:0;
+        background:rgba(124,58,237,0.2); border:2px solid rgba(124,58,237,0.5);
+        display:flex; align-items:center; justify-content:center; font-size:20px;
+        overflow:hidden;
+      ">👤</div>
+      <div>
+        <div id="prf-nombre" style="font-size:13px;color:white;font-weight:500;"></div>
+        <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:2px;">Perfil activo</div>
+      </div>
+    </div>
+
+    <!-- Lista de perfiles -->
+    <div id="prf-lista" style="padding:6px 0; max-height:180px; overflow-y:auto;"></div>
+
+    <!-- Separador -->
+    <div style="height:1px;background:rgba(255,255,255,0.06);margin:0 12px;"></div>
+
+    <!-- Acciones -->
+    <div style="padding:6px 0;">
+      <div class="prf-item" id="prf-editar-btn">
+        <span>✏️</span> Editar perfiles
+      </div>
+      <div class="prf-item" id="prf-invitado-btn">
+        <span>🕶</span> Modo invitado
+      </div>
+    </div>
+  </div>
+
+<svg id="wave" viewBox="0 0 1440 200" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M0,100 C200,40 400,160 600,80 C800,0 1050,150 1200,70 L1440,90 L1440,200 L0,200 Z" fill="rgba(124,58,237,0.07)"/>
+  <path d="M0,140 C300,90 550,180 800,120 C1000,70 1200,160 1440,110 L1440,200 L0,200 Z" fill="rgba(124,58,237,0.04)"/>
+  <path d="M0,170 C400,145 800,190 1440,158 L1440,200 L0,200 Z" fill="rgba(124,58,237,0.03)"/>
+</svg>
+
+<div id="main">
+
+  <div id="clock-wrap">
+    <div id="clock">00<span>:</span>00</div>
+    <div id="date">Cargando...</div>
+  </div>
+
+  <div id="splash"></div>
+
+  <div id="search-wrap">
+    <span id="search-engine">GOOGLE</span>
+    <input id="search" type="text" placeholder="Busca en la web o escribe una URL..." autocomplete="off"/>
+  </div>
+  <div id="search-suggestions" style="display:none;position:fixed;z-index:100;
+    background:#1a1a2e;border:1px solid rgba(124,58,237,0.3);
+    border-radius:0 0 8px 8px;overflow:hidden;"></div>
+
+  <div id="dials-wrap">
+    <div id="dials-label">Accesos directos</div>
+    <div id="dials"></div>
+  </div>
+
+  <!-- Widgets DENTRO de #main -->
+  <div id="widgets-wrap">
+
+    <div class="widget" id="w-clima">
+      <div class="widget-title">🌤 Clima</div>
+      <div id="w-clima-body">
+        <span class="clima-msg">Cargando...</span>
+      </div>
+    </div>
+
+    <div class="widget" id="w-notas">
+      <div class="widget-title">📝 Notas rápidas</div>
+      <textarea id="w-notas-input" placeholder="Escribe algo..."></textarea>
+      <div id="w-notas-saved">Guardado ✓</div>
+    </div>
+
+    <div class="widget" id="w-news">
+      <div class="widget-title">📰 Noticias tech</div>
+      <div id="w-news-list">
+        <span class="news-msg">Cargando...</span>
+      </div>
+    </div>
+
+    <div class="widget" id="w-perf">
+      <div class="widget-title">⚡ RENDIMIENTO</div>
+      <div id="w-perf-grid">
+        <div class="perf-item">
+          <div class="perf-label">CPU <span id="perf-cpu-val">0%</span></div>
+          <div class="perf-bar"><div class="perf-fill" id="perf-cpu-bar"></div></div>
+        </div>
+        <div class="perf-item">
+          <div class="perf-label">RAM <span id="perf-ram-val">0%</span></div>
+          <div class="perf-bar"><div class="perf-fill" id="perf-ram-bar"></div></div>
+        </div>
+        <div class="perf-item">
+          <div class="perf-label">DSK <span id="perf-disco-val">0%</span></div>
+          <div class="perf-bar"><div class="perf-fill" id="perf-disco-bar"></div></div>
+        </div>
+        <div class="perf-item">
+          <div class="perf-label">NET <span id="perf-red-val">0 KB/s</span></div>
+          <div class="perf-bar"><div class="perf-fill" id="perf-red-bar"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="widget" id="w-pomodoro">
+      <div class="widget-title">⏱ Temporizador</div>
+      <div id="w-pomodoro-body">
+        <div id="w-pomodoro-modes">
+          <span class="pomo-mode active" data-mins="25" data-label="Trabajo">Trabajo</span>
+          <span class="pomo-mode" data-mins="5" data-label="Descanso corto">Descanso</span>
+          <span class="pomo-mode" data-mins="15" data-label="Descanso largo">Largo</span>
+        </div>
+        <div id="w-pomodoro-time">25:00</div>
+        <div id="w-pomodoro-label">Listo para empezar</div>
+        <div id="w-pomodoro-controls">
+          <button class="pomo-btn" id="pomo-start">Iniciar</button>
+          <button class="pomo-btn" id="pomo-reset">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="widget" id="w-tareas">
+      <div class="widget-title">📅 Tareas</div>
+      <div id="w-tareas-body">
+        <div id="w-tareas-list"></div>
+        <div id="w-tareas-input-wrap">
+          <input id="w-tareas-input" type="text" placeholder="Nueva tarea..." maxlength="60"/>
+          <button id="w-tareas-add">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="widget" id="w-musica">
+      <div id="musica-bg"></div>
+      <div id="musica-content">
+        <div id="musica-widget-title">▶ Reproducción</div>
+        <div id="musica-empty-msg">Sin reproducción activa</div>
+        <div id="musica-player-inner">
+          <div id="musica-top-row">
+            <img id="musica-img" alt=""/>
+            <div id="musica-meta">
+              <div id="w-musica-titulo"></div>
+              <div id="w-musica-artista"></div>
+              <div id="musica-fuente"></div>
+            </div>
+          </div>
+          <div id="musica-controles">
+            <button class="musica-btn" id="musica-prev">⏮</button>
+            <button class="musica-btn" id="musica-play">▶</button>
+            <button class="musica-btn" id="musica-next">⏭</button>
+          </div>
+          <div id="musica-progress-wrap">
+            <div id="musica-progress-bg">
+              <div id="w-musica-progress-bar"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<!-- Modal -->
+<div id="modal-overlay" style="display:none">
+  <div id="modal">
+    <div id="modal-title">Agregar acceso directo</div>
+    <div class="modal-field">
+      <label>Nombre</label>
+      <input id="modal-name" type="text" placeholder="YouTube"/>
+    </div>
+    <div class="modal-field">
+      <label>URL</label>
+      <input id="modal-url" type="text" placeholder="https://youtube.com"/>
+    </div>
+    <div class="modal-field">
+      <label style="font-size:11px;color:var(--muted);margin-top:8px;display:block;">Color de acento</label>
+      <input id="modal-color" type="color" value="#7c3aed"
+        style="width:100%;height:32px;border:1px solid var(--border);border-radius:6px;
+              background:var(--surface2);cursor:pointer;padding:2px 4px;margin-top:4px;"/>
+    </div>
+    <div id="modal-actions">
+      <button id="modal-cancel">Cancelar</button>
+      <button id="modal-save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Ctx menu -->
+<div id="ctx-menu" style="display:none">
+  <div class="ctx-item" id="ctx-edit">✏ Editar</div>
+  <div class="ctx-item ctx-danger" id="ctx-delete">🗑 Eliminar</div>
+</div>
+
+<button id="customize-btn" title="Personalizar">✏</button>
+
+<div id="customize-panel">
+  <div class="cp-header">
+    Personalizar
+    <button class="cp-close" id="cp-close">×</button>
+  </div>
+
+  <!-- Fondo -->
+  <div class="cp-section">
+    <div class="cp-section-title">🖼 Fondo</div>
+    <div class="cp-row">
+      <span>Imagen de fondo</span>
+      <div style="display:flex;gap:6px">
+        <button class="cp-btn" id="cp-elegir-fondo">Elegir</button>
+        <button class="cp-btn danger" id="cp-quitar-fondo">Quitar</button>
+      </div>
+    </div>
+    <div class="cp-opac-label">
+      <span>Transparencia</span>
+      <span id="cp-opac-val">35%</span>
+    </div>
+    <input type="range" class="cp-slider" id="cp-opac-slider" min="0" max="80" value="35" />
+  </div>
+
+  <!-- Widgets -->
+  <div class="cp-section">
+    <div class="cp-section-title">⚙ Widgets</div>
+    <div class="cp-row">
+      <span>🌤 Clima</span>
+      <button class="cp-toggle on" data-widget="w-clima"></button>
+    </div>
+    <div class="cp-row">
+      <span>📝 Notas</span>
+      <button class="cp-toggle on" data-widget="w-notas"></button>
+    </div>
+    <div class="cp-row">
+      <span>📰 Noticias</span>
+      <button class="cp-toggle on" data-widget="w-news"></button>
+    </div>
+    <div class="cp-row">
+      <span>⚡ Rendimiento</span>
+      <button class="cp-toggle on" data-widget="w-perf"></button>
+    </div>
+    <div class="cp-row">
+      <span>⏱ Temporizador</span>
+      <button class="cp-toggle on" data-widget="w-pomodoro"></button>
+    </div>
+    <div class="cp-row">
+      <span>✅ Tareas</span>
+      <button class="cp-toggle on" data-widget="w-tareas"></button>
+    </div>
+    <div class="cp-row">
+      <span>▶ Reproductor</span>
+      <button class="cp-toggle on" data-widget="w-musica"></button>
+    </div>
+    <div class="cp-row">
+      <span>✨ Splash text</span>
+      <button class="cp-toggle on" data-widget="splash"></button>
+    </div>
+    <!-- Reloj -->
+    <div class="cp-section">
+      <div class="cp-section-title">🕐 Reloj</div>
+      <div class="cp-row">
+        <span>Mostrar segundos</span>
+        <button class="cp-toggle" id="cp-toggle-segundos"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tema rápido -->
+  <div class="cp-section">
+    <div class="cp-section-title">🎨 Tema</div>
+    <div class="cp-row">
+      <span>Más opciones</span>
+      <button class="cp-btn" id="cp-ir-ajustes">Ajustes →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Defaults ───────────────────────────────────────
+  const DEFAULT_DIALS = [
+    { nombre: 'YouTube', url: 'https://youtube.com' },
+    { nombre: 'X',       url: 'https://x.com' },
+    { nombre: 'Discord', url: 'https://discord.com/app' },
+    { nombre: 'GitHub',  url: 'https://github.com' },
+  ];
+  let dials = [];
+  let editIndex = -1;
+  let ctxIndex  = -1;
+
+  let buscadorActivo = 'google';
+
+  function getBuscadorUrl(query) {
+    const q = encodeURIComponent(query);
+    switch (buscadorActivo) {
+      case 'bing':       return 'https://www.bing.com/search?q=' + q;
+      case 'duckduckgo': return 'https://duckduckgo.com/?q=' + q;
+      case 'brave':      return 'https://search.brave.com/search?q=' + q;
+      default:           return 'https://www.google.com/search?q=' + q;
+    }
+  }
+
+  // ── Reloj ──────────────────────────────────────────
+  window.__segundos = false;
+  window.__clockIsTimeout = false;
+
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    const s = String(now.getSeconds()).padStart(2,'0');
+    const seg = window.__segundos
+      ? `<span style="font-size:0.45em;opacity:0.6;letter-spacing:0;margin-left:4px">:${s}</span>`
+      : '';
+    document.getElementById('clock').innerHTML = h + '<span>:</span>' + m + seg;
+    const days   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const months = ['enero','febrero','marzo','abril','mayo','junio',
+                    'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    document.getElementById('date').textContent =
+      days[now.getDay()] + ' · ' + now.getDate() + ' de ' + months[now.getMonth()];
+  }
+
+  function iniciarReloj() {
+    clearInterval(window.__clockInterval);
+    clearTimeout(window.__clockInterval);
+    window.__clockInterval = null;
+    updateClock();
+    if (window.__segundos) {
+      window.__clockIsTimeout = false;
+      window.__clockInterval = setInterval(updateClock, 1000);
+    } else {
+      const ahora = new Date();
+      const ms = (60 - ahora.getSeconds()) * 1000 - ahora.getMilliseconds();
+      window.__clockIsTimeout = true;
+      window.__clockInterval = setTimeout(() => {
+        window.__clockIsTimeout = false;
+        updateClock();
+        window.__clockInterval = setInterval(updateClock, 60000);
+      }, ms);
+    }
+  }
+
+  iniciarReloj();
+  window.chrome.webview.postMessage('get:segundos');
+
+  // ── Toggle segundos ─────────────────────────────────
+  const toggleSegundos = document.getElementById('cp-toggle-segundos');
+
+  toggleSegundos.addEventListener('click', () => {
+    window.__segundos = !window.__segundos;
+    window.chrome.webview.postMessage('set:segundos:' + window.__segundos);
+    toggleSegundos.classList.toggle('on', window.__segundos);
+    iniciarReloj();
+  });
+
+  // ── Búsqueda ───────────────────────────────────────
+  const searchInput = document.getElementById('search');
+  const sugBox = document.getElementById('search-suggestions');
+  let sugCts = null;
+
+  // Cerrar sugerencias al hacer clic fuera
+  document.addEventListener('click', e => {
+    if (!e.target.closest('#search-wrap') && !e.target.closest('#search-suggestions'))
+      sugBox.style.display = 'none';
+  });
+
+  searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      sugBox.style.display = 'none';
+      const val = this.value.trim();
+      if (!val) return;
+      let url;
+      if (val.startsWith('http://') || val.startsWith('https://'))
+        url = val;
+      else if (val.includes('.') && !val.includes(' '))
+        url = 'https://' + val;
+      else
+        url = getBuscadorUrl(val);
+      window.chrome.webview.postMessage('navigate:' + url);
+    }
+    if (e.key === 'Escape') sugBox.style.display = 'none';
+    if (e.key === 'ArrowDown') {
+      const items = sugBox.querySelectorAll('.sug-item');
+      if (items.length > 0) { items[0].focus(); e.preventDefault(); }
+    }
+  });
+
+  searchInput.addEventListener('input', async function() {
+    const val = this.value.trim();
+    if (!val) { sugBox.style.display = 'none'; return; }
+
+    clearTimeout(sugCts);
+    sugCts = setTimeout(async () => {
+      try {
+        window.chrome.webview.postMessage('sugerencias:' + val);
+      } catch { }
+    }, 200);
+  });
+
+  searchInput.addEventListener('blur', () => {
+    setTimeout(() => { sugBox.style.display = 'none'; }, 150);
+  });
+
+  // ── Dials ──────────────────────────────────────────
+  function getFavicon(url) {
+    try { return `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=64`; }
+    catch { return null; }
+  }
+
+  function renderDials() {
+    const c = document.getElementById('dials');
+    c.innerHTML = '';
+    dials.forEach((d, i) => {
+      const el = document.createElement('div');
+      el.className = 'dial';
+
+      let host = '';
+      try { host = new URL(d.url.startsWith('http') ? d.url : 'https://' + d.url).hostname; } catch {}
+
+      const faviconUrl = host ? `https://www.google.com/s2/favicons?domain=${host}&sz=64` : '';
+
+      // Color único por dominio basado en hash
+      function hashColor(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++)
+          hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        const h = Math.abs(hash) % 360;
+        return `hsl(${h}, 40%, 18%)`;
+      }
+      function hashColor2(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++)
+          hash = str.charCodeAt(i) + ((hash << 5) - hash);
+        const h = (Math.abs(hash) + 40) % 360;
+        return `hsl(${h}, 35%, 12%)`;
+      }
+
+      const baseColor = d.color || null;
+      const c1 = baseColor
+          ? baseColor
+          : hashColor(host || d.nombre);
+      const c2 = baseColor
+          ? `color-mix(in srgb, ${baseColor} 60%, #000)`
+          : hashColor2(host || d.nombre);
+
+      el.innerHTML = `
+        <div class="dial-card" style="background: linear-gradient(135deg, ${c1}, ${c2})">
+          ${faviconUrl
+            ? `<img class="dial-card-favicon" src="${faviconUrl}" alt="${d.nombre}"
+                onerror="this.style.display='none'">`
+            : `<span class="dial-card-emoji">🌐</span>`}
+        </div>
+        <span>${d.nombre}</span>`;
+
+      el.addEventListener('click', () => { window.location.href = d.url; });
+      el.addEventListener('contextmenu', ev => { ev.preventDefault(); ctxIndex = i; mostrarCtx(ev.clientX, ev.clientY); });
+      c.appendChild(el);
+    });
+
+    const add = document.createElement('div');
+    add.className = 'dial dial-add';
+    add.innerHTML = `<div class="dial-card" style="font-size:28px;color:var(--muted)">+</div><span>Añadir</span>`;
+    add.addEventListener('click', () => abrirModal(-1));
+    c.appendChild(add);
+  }
+
+  // ── Modal ──────────────────────────────────────────
+  function abrirModal(i) {
+    editIndex = i;
+    document.getElementById('modal-title').textContent = i === -1 ? 'Agregar acceso directo' : 'Editar acceso directo';
+    document.getElementById('modal-name').value = i === -1 ? '' : dials[i].nombre;
+    document.getElementById('modal-url').value  = i === -1 ? '' : dials[i].url;
+    document.getElementById('modal-color').value = i === -1 ? '#7c3aed' : (dials[i].color || '#7c3aed');
+    document.getElementById('modal-overlay').style.display = 'flex';
+    setTimeout(() => document.getElementById('modal-name').focus(), 50);
+  }
+  function cerrarModal() { document.getElementById('modal-overlay').style.display = 'none'; }
+
+  document.getElementById('modal-cancel').addEventListener('click', cerrarModal);
+  document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target.id === 'modal-overlay') cerrarModal(); });
+  document.getElementById('modal-save').addEventListener('click', () => {
+    let nombre = document.getElementById('modal-name').value.trim();
+    let url    = document.getElementById('modal-url').value.trim();
+    if (!url) return;
+    if (!url.startsWith('http')) url = 'https://' + url;
+    if (!nombre) try { nombre = new URL(url).hostname; } catch { nombre = url; }
+    const color = document.getElementById('modal-color').value;
+    if (editIndex === -1) dials.push({ nombre, url, color });
+    else dials[editIndex] = { nombre, url, color };
+    guardarDials(); renderDials(); cerrarModal();
+  });
+
+  // ── Ctx menu ───────────────────────────────────────
+  function mostrarCtx(x, y) {
+    const m = document.getElementById('ctx-menu');
+    m.style.display = 'block'; m.style.left = x+'px'; m.style.top = y+'px';
+  }
+  function cerrarCtx() { document.getElementById('ctx-menu').style.display = 'none'; }
+  document.getElementById('ctx-edit').addEventListener('click', () => { cerrarCtx(); abrirModal(ctxIndex); });
+  document.getElementById('ctx-delete').addEventListener('click', () => {
+    cerrarCtx(); dials.splice(ctxIndex, 1); guardarDials(); renderDials();
+  });
+  document.addEventListener('click', cerrarCtx);
+
+  // ── Persistencia ───────────────────────────────────
+  function guardarDials() {
+    window.chrome.webview.postMessage('dials:guardar:' + JSON.stringify(dials));
+  }
+
+  // ── Tema ───────────────────────────────────────────
+  function hexToRgba(hex, alpha) {
+    hex = hex.replace('#','');
+    const r = parseInt(hex.slice(0,2),16), g = parseInt(hex.slice(2,4),16), b = parseInt(hex.slice(4,6),16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  function aplicarTema(t) {
+    const root = document.documentElement;
+    root.style.setProperty('--accent',   t.Accent   ?? t.accent);
+    root.style.setProperty('--bg',       t.Bg       ?? t.bg);
+    root.style.setProperty('--surface',  t.Surface  ?? t.surface);
+    root.style.setProperty('--surface2', t.Surface2 ?? t.surface2);
+    root.style.setProperty('--border',   hexToRgba(t.Accent ?? t.accent, 0.25));
+    if (t.Font ?? t.font) root.style.setProperty('--font', `'${t.Font ?? t.font}', sans-serif`);
+  }
+
+  // ── Mensajes C# ────────────────────────────────────
+  const notasInput = document.getElementById('w-notas-input');
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string') return;
+    if (raw.startsWith('buscador:')) {
+      buscadorActivo = raw.slice('buscador:'.length).trim();
+      document.getElementById('search-engine').textContent = 
+        buscadorActivo.charAt(0).toUpperCase() + buscadorActivo.slice(1);
+    }
+    if (raw.startsWith('sugerencias:')) {
+      try {
+        const data = JSON.parse(raw.slice('sugerencias:'.length));
+        const sugs = data[1]?.slice(0, 7) ?? [];
+        const sugBox = document.getElementById('search-suggestions');
+        sugBox.innerHTML = '';
+        if (sugs.length === 0) { sugBox.style.display = 'none'; return; }
+
+        const rect = document.getElementById('search-wrap').getBoundingClientRect();
+        sugBox.style.left  = rect.left + 'px';
+        sugBox.style.top   = (rect.top + rect.height) + 'px';
+        sugBox.style.width = rect.width + 'px';
+
+        sugs.forEach(sug => {
+          const item = document.createElement('div');
+          item.className = 'sug-item';
+          item.textContent = sug;
+          item.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            const val = item.textContent.trim();
+            document.getElementById('search').value = val;
+            sugBox.style.display = 'none';
+            window.chrome.webview.postMessage('navigate:' + getBuscadorUrl(val));
+          });
+          sugBox.appendChild(item);
+        });
+        sugBox.style.display = 'block';
+      } catch { }
+      return;
+    }
+    if (raw.startsWith('segundos:')) {
+      const val = raw.slice('segundos:'.length) === 'true';
+      window.__segundos = val;
+      toggleSegundos.classList.toggle('on', val);
+      iniciarReloj();
+      return;
+    }
+    if (raw.startsWith('tema:'))  { aplicarTema(JSON.parse(raw.slice(5))); }
+    if (raw.startsWith('fondo:opacidad:')) {
+      const op = parseInt(raw.slice('fondo:opacidad:'.length));
+      const img = document.getElementById('bg-image');
+      if (!isNaN(op)) {
+        img.style.opacity = (op / 100).toFixed(2);
+        // Transparencia inversa para widgets — más fondo visible = más transparentes
+        const widgetOpac = Math.max(0.2, 1 - (op / 100) * 0.8);
+        document.documentElement.style.setProperty('--widget-opac', widgetOpac.toFixed(2));
+      }
+      return;
+    }
+    if (raw.startsWith('perfil:activo:')) {
+      try {
+        const p = JSON.parse(raw.slice('perfil:activo:'.length));
+        if (p && p.EsInvitado) {
+          document.getElementById('invitado-screen').classList.add('visible');
+        }
+      } catch {}
+      return;
+    }
+    if (raw.startsWith('fondo:')) {
+      const ruta = raw.slice(6);
+      const img = document.getElementById('bg-image');
+      if (ruta) {
+        img.src = 'file:///' + ruta;
+        document.body.classList.add('has-bg');
+      } else {
+        img.src = '';
+        document.body.classList.remove('has-bg');
+      }
+    }
+    if (raw.startsWith('dials:')) { const d = JSON.parse(raw.slice(6)); dials = d.length > 0 ? d : [...DEFAULT_DIALS]; renderDials(); }
+    if (raw.startsWith('notas:')) { notasInput.value = raw.slice(6); }
+    if (raw.startsWith('rendimiento:')) {
+      const parts = raw.slice('rendimiento:'.length).split(',');
+      const cpu   = parseInt(parts[0]);
+      const ram   = parseInt(parts[1]);
+      const disco = parseInt(parts[2] ?? '0');
+      const red   = parseInt(parts[3] ?? '0');
+
+      const set = (valId, barId, val, isKb) => {
+        const valEl = document.getElementById(valId);
+        const barEl = document.getElementById(barId);
+        if (!valEl || !barEl) return;
+        valEl.textContent = isKb ? val + ' KB/s' : val + '%';
+        barEl.style.width = Math.min(val, 100) + '%';
+        barEl.className = 'perf-fill' +
+          (val > 85 ? ' danger' : val > 60 ? ' warning' : '');
+      };
+
+      set('perf-cpu-val',   'perf-cpu-bar',   cpu,   false);
+      set('perf-ram-val',   'perf-ram-bar',   ram,   false);
+      set('perf-disco-val', 'perf-disco-bar', disco, false);
+
+      // Red: normalizar a porcentaje para la barra (max visual ~1000 KB/s)
+      const redPct = Math.min(red / 10, 100);
+      const redEl  = document.getElementById('perf-red-val');
+      const redBar = document.getElementById('perf-red-bar');
+      if (redEl)  redEl.textContent = red + ' KB/s';
+      if (redBar) { redBar.style.width = redPct + '%'; redBar.className = 'perf-fill'; }
+
+      return;
+    }
+  });
+
+  // ── Widget Clima ───────────────────────────────────
+  function iconoClima(c) {
+    if (c === 0) return '☀️';
+    if (c <= 2)  return '🌤️';
+    if (c <= 3)  return '☁️';
+    if (c <= 48) return '🌫️';
+    if (c <= 67) return '🌧️';
+    if (c <= 77) return '❄️';
+    if (c <= 82) return '🌦️';
+    return '⛈️';
+  }
+
+  async function iniciarClima() {
+    const body = document.getElementById('w-clima-body');
+    try {
+      // Usamos wttr.in que no requiere API key ni permisos
+      const res  = await fetch('https://wttr.in/?format=j1');
+      const data = await res.json();
+      const cur  = data.current_condition[0];
+      const area = data.nearest_area[0];
+      const ciudad = area.areaName[0].value + ', ' + area.country[0].value;
+      const temp   = cur.temp_C;
+      const desc   = cur.weatherDesc[0].value;
+      const wcode  = parseInt(cur.weatherCode);
+
+      // Mapear código wttr a nuestro iconoClima
+      let icono = '🌤️';
+      if (wcode === 113) icono = '☀️';
+      else if (wcode <= 116) icono = '🌤️';
+      else if (wcode <= 119) icono = '☁️';
+      else if (wcode <= 143) icono = '🌫️';
+      else if (wcode <= 266) icono = '🌧️';
+      else if (wcode <= 338) icono = '❄️';
+      else if (wcode <= 377) icono = '🌨️';
+      else icono = '⛈️';
+
+      body.innerHTML = `
+        <div id="w-clima-icon">${icono}</div>
+        <div>
+          <div id="w-clima-temp">${temp}°C</div>
+          <div id="w-clima-desc">${ciudad}</div>
+        </div>`;
+    } catch {
+      body.innerHTML = '<span class="clima-msg">Sin conexión</span>';
+    }
+  }
+
+  // ── Widget Notas ───────────────────────────────────
+  const notasSaved = document.getElementById('w-notas-saved');
+  let notasTimer = null;
+  notasInput.addEventListener('input', () => {
+    clearTimeout(notasTimer);
+    notasTimer = setTimeout(() => {
+      window.chrome.webview.postMessage('notas:guardar:' + notasInput.value);
+      notasSaved.style.opacity = '1';
+      setTimeout(() => notasSaved.style.opacity = '0', 1500);
+    }, 800);
+  });
+
+  // ── Widget Noticias ────────────────────────────────
+  async function cargarNoticias() {
+    const lista = document.getElementById('w-news-list');
+    try {
+      const proxy = 'https://api.allorigins.win/get?url=';
+      const feed  = 'https://www.theverge.com/rss/index.xml';
+      const res   = await fetch(proxy + encodeURIComponent(feed));
+      const json  = await res.json();
+      const xml   = new DOMParser().parseFromString(json.contents, 'text/xml');
+      const items = Array.from(xml.querySelectorAll('item, entry')).slice(0, 4);
+
+      lista.innerHTML = '';
+      items.forEach(item => {
+        const titulo = item.querySelector('title')?.textContent ?? '';
+        const linkEl = item.querySelector('link');
+        const link   = linkEl?.textContent?.trim() || linkEl?.getAttribute('href') || '#';
+        const el = document.createElement('div');
+        el.className = 'news-item';
+        el.innerHTML = `<div class="news-title">${titulo}</div><div class="news-source">The Verge</div>`;
+        el.addEventListener('click', () => { window.location.href = link; });
+        lista.appendChild(el);
+      });
+    } catch {
+      lista.innerHTML = '<span class="news-msg">Sin conexión</span>';
+    }
+  }
+
+  // ── Init ───────────────────────────────────────────
+  window.chrome.webview.postMessage('get:tema');
+  window.chrome.webview.postMessage('get:dials');
+  window.chrome.webview.postMessage('get:notas');
+  window.chrome.webview.postMessage('get:fondo:opacidad');
+  window.chrome.webview.postMessage('get:fondo');
+  window.chrome.webview.postMessage('get:buscador');
+  window.chrome.webview.postMessage('get:perfil:activo');
+  iniciarClima();
+  cargarNoticias();
+
+  // ── Widget Pomodoro ────────────────────────────────
+  (function() {
+    let totalSecs = 25 * 60;
+    let remaining = totalSecs;
+    let running = false;
+    let timer = null;
+    let label = 'Trabajo';
+
+    const timeEl  = document.getElementById('w-pomodoro-time');
+    const labelEl = document.getElementById('w-pomodoro-label');
+    const startBtn = document.getElementById('pomo-start');
+    const resetBtn = document.getElementById('pomo-reset');
+
+    function fmt(s) {
+      const m = String(Math.floor(s / 60)).padStart(2,'0');
+      const sec = String(s % 60).padStart(2,'0');
+      return `${m}:${sec}`;
+    }
+
+    function render() {
+      timeEl.textContent = fmt(remaining);
+    }
+
+    function tick() {
+      if (remaining <= 0) {
+        clearInterval(timer);
+        running = false;
+        startBtn.textContent = 'Iniciar';
+        startBtn.classList.remove('active');
+        labelEl.textContent = '¡Tiempo!';
+        // Notificación
+        if (Notification.permission === 'granted')
+          new Notification('AtsukiBrowser', { body: `${label} terminado.` });
+        return;
+      }
+      remaining--;
+      render();
+      labelEl.textContent = running ? label + ' en curso...' : label;
+    }
+
+    startBtn.addEventListener('click', () => {
+      if (running) {
+        clearInterval(timer);
+        running = false;
+        startBtn.textContent = 'Reanudar';
+        startBtn.classList.remove('active');
+        labelEl.textContent = 'Pausado';
+      } else {
+        running = true;
+        startBtn.textContent = 'Pausar';
+        startBtn.classList.add('active');
+        labelEl.textContent = label + ' en curso...';
+        timer = setInterval(tick, 1000);
+      }
+    });
+
+    resetBtn.addEventListener('click', () => {
+      clearInterval(timer);
+      running = false;
+      remaining = totalSecs;
+      startBtn.textContent = 'Iniciar';
+      startBtn.classList.remove('active');
+      labelEl.textContent = 'Listo para empezar';
+      render();
+    });
+
+    document.querySelectorAll('.pomo-mode').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.pomo-mode').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        totalSecs = parseInt(btn.dataset.mins) * 60;
+        remaining = totalSecs;
+        label = btn.dataset.label;
+        clearInterval(timer);
+        running = false;
+        startBtn.textContent = 'Iniciar';
+        startBtn.classList.remove('active');
+        labelEl.textContent = 'Listo para empezar';
+        render();
+      });
+    });
+
+    // Pedir permiso notificaciones
+    if (Notification.permission === 'default')
+      Notification.requestPermission();
+
+    render();
+  })();
+
+  // ── Widget Tareas ──────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function() {
+  (function() {
+    let tareas = [];
+
+    function renderTareas() {
+      const list = document.getElementById('w-tareas-list');
+      list.innerHTML = '';
+      tareas.forEach((t, i) => {
+        const el = document.createElement('div');
+        el.className = 'tarea-item' + (t.done ? ' done' : '');
+        el.innerHTML = `
+          <div class="tarea-check"></div>
+          <div class="tarea-text">${t.text}</div>
+          <button class="tarea-del">×</button>
+        `;
+        el.querySelector('.tarea-check').addEventListener('click', () => {
+          tareas[i].done = !tareas[i].done;
+          guardarTareas();
+          renderTareas();
+        });
+        el.querySelector('.tarea-text').addEventListener('click', () => {
+          tareas[i].done = !tareas[i].done;
+          guardarTareas();
+          renderTareas();
+        });
+        el.querySelector('.tarea-del').addEventListener('click', e => {
+          e.stopPropagation();
+          tareas.splice(i, 1);
+          guardarTareas();
+          renderTareas();
+        });
+        list.appendChild(el);
+      });
+    }
+
+    function guardarTareas() {
+      window.chrome.webview.postMessage('tareas:guardar:' + JSON.stringify(tareas));
+    }
+
+    document.getElementById('w-tareas-add').addEventListener('click', agregarTarea);
+    document.getElementById('w-tareas-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') agregarTarea();
+    });
+
+    function agregarTarea() {
+      const input = document.getElementById('w-tareas-input');
+      const texto = input.value.trim();
+      if (!texto) return;
+      tareas.push({ text: texto, done: false });
+      input.value = '';
+      guardarTareas();
+      renderTareas();
+    }
+
+    // Recibir tareas guardadas
+    window.chrome.webview.addEventListener('message', e => {
+      const raw = e.data;
+      if (typeof raw === 'string' && raw.startsWith('tareas:')) {
+        try {
+          tareas = JSON.parse(raw.slice('tareas:'.length));
+          renderTareas();
+        } catch { }
+      }
+    });
+
+    window.chrome.webview.postMessage('get:tareas');
+  })();
+  }); // DOMContentLoaded
+
+  // ── Widget Música ──────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function() {
+    const emptyMsg    = document.getElementById('musica-empty-msg');
+    const playerInner = document.getElementById('musica-player-inner');
+    const titulo      = document.getElementById('w-musica-titulo');
+    const artista     = document.getElementById('w-musica-artista');
+    const fuenteEl    = document.getElementById('musica-fuente');
+    const img         = document.getElementById('musica-img');
+    const bg          = document.getElementById('musica-bg');
+    const bar         = document.getElementById('w-musica-progress-bar');
+    const playBtn     = document.getElementById('musica-play');
+
+    if (!emptyMsg || !playerInner || !playBtn) return;
+
+    let estadoActual = { playing: false };
+
+    function aplicarMusica(m) {
+      if (!m || !m.titulo) {
+        emptyMsg.style.display = '';
+        playerInner.style.display = 'none';
+        if (bg) bg.style.backgroundImage = '';
+        estadoActual = { playing: false };
+        return;
+      }
+
+      emptyMsg.style.display = 'none';
+      playerInner.style.display = 'flex';
+      estadoActual = m;
+
+      if (titulo)   titulo.textContent   = m.titulo  || 'Sin título';
+      if (artista)  artista.textContent  = m.artista || '';
+      if (fuenteEl) fuenteEl.textContent = m.fuente  || '';
+      if (bar)      bar.style.width      = (m.progress || 0) + '%';
+      playBtn.textContent = m.playing ? '⏸' : '▶';
+
+      if (m.imagen && img) {
+        img.src = m.imagen;
+        img.style.display = 'block';
+        img.className = m.playing ? 'playing' : '';
+        if (bg) bg.style.backgroundImage = `url('${m.imagen}')`;
+      } else if (img) {
+        img.style.display = 'none';
+        img.className = '';
+        if (bg) bg.style.backgroundImage = '';
+      }
+    }
+
+    window.chrome.webview.addEventListener('message', e => {
+      const raw = e.data;
+      if (typeof raw !== 'string' || !raw.startsWith('musica:')) return;
+      try { aplicarMusica(JSON.parse(raw.slice('musica:'.length))); } catch { }
+    });
+
+    // Play/pause — actualizar ícono inmediatamente sin esperar respuesta
+    playBtn.addEventListener('click', () => {
+      const ahoraPlaying = !estadoActual.playing;
+      playBtn.textContent = ahoraPlaying ? '⏸' : '▶';
+      if (img) img.className = ahoraPlaying ? 'playing' : '';
+      estadoActual.playing = ahoraPlaying;
+      window.chrome.webview.postMessage('musica:play');
+    });
+
+    // Anterior/siguiente — feedback visual breve
+    document.getElementById('musica-prev')?.addEventListener('click', () => {
+      window.chrome.webview.postMessage('musica:anterior');
+    });
+
+    document.getElementById('musica-next')?.addEventListener('click', () => {
+      window.chrome.webview.postMessage('musica:siguiente');
+    });
+
+    // Solo pedir estado al cargar — las actualizaciones llegan por eventos
+    window.chrome.webview.postMessage('get:musica');
+  });
+
+  // ── Menú personalización ───────────────────────────
+  const customizeBtn = document.getElementById('customize-btn');
+  const customizePanel = document.getElementById('customize-panel');
+
+  customizeBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const isOpen = customizePanel.classList.contains('open');
+    customizePanel.classList.toggle('open', !isOpen);
+  });
+
+  document.getElementById('cp-close').addEventListener('click', e => {
+    e.stopPropagation();
+    customizePanel.classList.remove('open');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#perfil-badge') && !e.target.closest('#prf-menu'))
+        cerrarPopup();
+  });
+
+  // Fondo
+  document.getElementById('cp-elegir-fondo').addEventListener('click', () =>
+    window.chrome.webview.postMessage('fondo:elegir'));
+
+  document.getElementById('cp-quitar-fondo').addEventListener('click', () => {
+    const img = document.getElementById('bg-image');
+    img.src = ''; document.body.classList.remove('has-bg');
+    window.chrome.webview.postMessage('fondo:quitar');
+  });
+
+  // Slider opacidad
+  const cpSlider  = document.getElementById('cp-opac-slider');
+  const cpOpacVal = document.getElementById('cp-opac-val');
+  cpSlider.addEventListener('input', () => {
+    const op = parseInt(cpSlider.value);
+    cpOpacVal.textContent = op + '%';
+    document.getElementById('bg-image').style.opacity = (op / 100).toFixed(2);
+    const widgetOpac = Math.max(0.2, 1 - (op / 100) * 0.8);
+    document.documentElement.style.setProperty('--widget-opac', widgetOpac.toFixed(2));
+    window.chrome.webview.postMessage('fondo:opacidad:' + op);
+  });
+
+  // Widgets toggles
+  document.querySelectorAll('.cp-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('on');
+      const widget = document.getElementById(btn.dataset.widget);
+      if (widget) widget.style.display = btn.classList.contains('on') ? '' : 'none';
+      guardarConfigWidgets();
+    });
+  });
+
+  // Aplicar estado inicial del splash desde config guardada
+  (function() {
+    const config = {};
+    document.querySelectorAll('.cp-toggle').forEach(btn => {
+      config[btn.dataset.widget] = btn.classList.contains('on');
+    });
+  })();
+
+  function guardarConfigWidgets() {
+    const config = {};
+    document.querySelectorAll('.cp-toggle').forEach(btn => {
+      config[btn.dataset.widget] = btn.classList.contains('on');
+    });
+    window.chrome.webview.postMessage('widgets:config:' + JSON.stringify(config));
+  }
+
+  // Ajustes
+  document.getElementById('cp-ir-ajustes').addEventListener('click', () =>
+    window.chrome.webview.postMessage('navigate:ajustes'));
+
+  // ── Listener unificado de mensajes C# ─────────────
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string') return;
+
+    if (raw.startsWith('fondo:opacidad:')) {
+      const op = parseInt(raw.slice('fondo:opacidad:'.length));
+      if (!isNaN(op)) {
+        cpSlider.value = op;
+        cpOpacVal.textContent = op + '%';
+        document.getElementById('bg-image').style.opacity = (op / 100).toFixed(2);
+        const widgetOpac = Math.max(0.2, 1 - (op / 100) * 0.8);
+        document.documentElement.style.setProperty('--widget-opac', widgetOpac.toFixed(2));
+      }
+      return;
+    }
+
+    if (raw.startsWith('fondo:')) {
+      const ruta = raw.slice(6);
+      const img = document.getElementById('bg-image');
+      if (ruta) { img.src = 'file:///' + ruta; document.body.classList.add('has-bg'); }
+      else { img.src = ''; document.body.classList.remove('has-bg'); }
+      return;
+    }
+
+    if (raw.startsWith('widgets:config:')) {
+      try {
+        const config = JSON.parse(raw.slice('widgets:config:'.length));
+        window.__widgetsConfig = config; // guardar globalmente para widgets inyectados después
+        Object.entries(config).forEach(([id, visible]) => {
+          const widget = document.getElementById(id);
+          const toggle = document.querySelector(`.cp-toggle[data-widget="${id}"]`);
+          if (widget) widget.style.display = visible ? '' : 'none';
+          if (toggle) toggle.classList.toggle('on', !!visible);
+        });
+      } catch { }
+      return;
+    }
+
+    if (raw.startsWith('tareas:')) {
+      try {
+        // manejado por el widget de tareas
+      } catch { }
+      return;
+    }
+  });
+
+  // ── Insignia de perfil ─────────────────────────────
+  let _perfilesData = null;
+
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string' || !raw.startsWith('perfiles:')) return;
+    try {
+      _perfilesData = JSON.parse(raw.slice('perfiles:'.length));
+      const p = _perfilesData.activo;
+      if (!p) return;
+
+      // Actualizar badge
+      const avatar = document.getElementById('perfil-badge-avatar');
+      const icono  = p.Icono ?? p.icono ?? '';
+      const imgStyle = 'width:100%;height:100%;object-fit:cover;border-radius:50%;';
+      if (icono) {
+        const src = icono.startsWith('/') ? `file://${icono}` : `file:///${icono}`;
+        avatar.innerHTML = `<img src="${src}" style="${imgStyle}">`;
+      } else {
+        avatar.textContent = p.Emoji ?? p.emoji ?? '👤';
+      }
+
+      // Actualizar popup header
+      const popupAvatar = document.getElementById('prf-avatar');
+      const popupNombre = document.getElementById('prf-nombre');
+      if (icono) {
+        const src = icono.startsWith('/') ? `file://${icono}` : `file:///${icono}`;
+        popupAvatar.innerHTML = `<img src="${src}" style="${imgStyle}">`;
+      } else {
+        popupAvatar.textContent = p.Emoji ?? p.emoji ?? '👤';
+      }
+      popupNombre.textContent = p.Nombre ?? p.nombre ?? 'Principal';
+
+      // Renderizar lista de perfiles
+      const lista = document.getElementById('prf-lista');
+      lista.innerHTML = '';
+      const perfiles = _perfilesData.perfiles ?? _perfilesData.Perfiles ?? [];
+      perfiles.forEach(pf => {
+        const activoId = p.Id ?? p.id;
+        const pfId     = pf.Id ?? pf.id;
+        const div = document.createElement('div');
+        div.className = 'prf-perfil-item' + (pfId === activoId ? ' activo' : '');
+        const pfIcono = pf.Icono ?? pf.icono ?? '';
+        div.innerHTML = pfIcono
+          ? `<img src="file:///${pfIcono}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;">`
+          : `<span style="font-size:18px;">${pf.Emoji ?? pf.emoji ?? '👤'}</span>`;
+        div.innerHTML += `<span>${pf.Nombre ?? pf.nombre}</span>`;
+        div.addEventListener('click', () => {
+          window.chrome.webview.postMessage('perfil:cambiar:' + pfId);
+          cerrarPopup();
+        });
+        lista.appendChild(div);
+      });
+    } catch { }
+  });
+
+  function cerrarPopup() {
+    const popup = document.getElementById('prf-menu');
+    if (popup) popup.style.display = 'none';
+  }
+
+  // Toggle popup
+  document.getElementById('perfil-badge').addEventListener('click', (e) => {
+    e.stopImmediatePropagation();
+    const popup = document.getElementById('prf-menu');
+    if (popup.style.display === 'block') {
+        cerrarPopup();
+        return;
+    }
+    window.chrome.webview.postMessage('get:perfiles');
+    const mostrarUnaVez = e2 => {
+        if (typeof e2.data === 'string' && e2.data.startsWith('perfiles:')) {
+            popup.style.display = 'block';
+            window.chrome.webview.removeEventListener('message', mostrarUnaVez);
+        }
+    };
+    window.chrome.webview.addEventListener('message', mostrarUnaVez);
+    setTimeout(() => {
+        window.chrome.webview.removeEventListener('message', mostrarUnaVez);
+        popup.style.display = 'block';
+    }, 500);
+  });
+
+  document.getElementById('prf-editar-btn').addEventListener('click', () => {
+    cerrarPopup();
+    window.chrome.webview.postMessage('perfiles');
+  });
+
+  document.getElementById('prf-invitado-btn').addEventListener('click', () => {
+    cerrarPopup();
+    window.chrome.webview.postMessage('perfil:cambiar:invitado');
+  });
+
+  window.chrome.webview.postMessage('get:perfiles');
+  window.chrome.webview.postMessage('get:widgets:config');
+
+  // ── Splash text ───────────────────────────────────
+  (function() {
+    const splashes = [
+      '¡Ahora con perfiles!',
+      'Mambo',
+      'No es Chrome, te lo juro',
+      '¡Abre una pestaña más!',
+      'rgb(124, 58, 237)',
+      'v0.4 Alpha — casi beta',
+      '¿Ya revisaste tus favoritos?',
+      'Modo invitado activado... o no',
+      'Sin anuncios, sin dramas',
+      '¡El historial no miente!',
+      'Electric Bogaloo',
+      'Ctrl+T para más pestañas',
+      '¿Cuántas pestañas son demasiadas?',
+      'AtsukiBrowser™',
+      'Partículas interactivas ✨',
+      'Tus extensiones están activas',
+      '¡Personaliza tu sidebar!',
+      'Menos es más... o no',
+      'npm install felicidad',
+      '¡Exporta tus extensiones!',
+      '¿Cuál será tu fondo de pantalla?',
+      '¡Widgets para todos!',
+      'La velocidad de la luz... o casi',
+    ];
+
+    const el = document.getElementById('splash');
+    if (!el) return;
+
+    el.textContent = splashes[Math.floor(Math.random() * splashes.length)];
+
+    // Reanimar al hacer clic
+    el.addEventListener('click', () => {
+      el.textContent = splashes[Math.floor(Math.random() * splashes.length)];
+      el.style.animation = 'none';
+      requestAnimationFrame(() => {
+        el.style.animation = '';
+      });
+    });
+  })();
+</script>
+  <div id="search-suggestions"></div>
+</body>
+</html>

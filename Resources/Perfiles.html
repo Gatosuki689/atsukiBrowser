@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Perfiles</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --accent: #7c3aed;
+    --bg: #0d0d14;
+    --surface: #13131f;
+    --surface2: #1a1a2e;
+    --border: rgba(124,58,237,0.25);
+    --text: rgba(255,255,255,0.85);
+    --muted: rgba(255,255,255,0.35);
+  }
+  body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; }
+
+  #sidebar {
+    width: 240px; min-width: 240px; height: 100vh; position: sticky; top: 0;
+    background: #0a0a10; border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; overflow-y: auto;
+  }
+  #sidebar-header { padding: 20px 16px 12px; border-bottom: 1px solid var(--border); }
+  #accent-bar { width: 32px; height: 2px; background: var(--accent); border-radius: 2px; margin-bottom: 8px; }
+  #sidebar-header h1 { font-size: 15px; font-weight: 700; color: white; letter-spacing: 0.05em; text-transform: uppercase; }
+  #sidebar-header p { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .sb-section { padding: 16px 8px 4px; }
+  .sb-section-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; padding: 0 8px; margin-bottom: 4px; }
+  .sb-item {
+    display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 13px; color: var(--muted); transition: all 0.15s;
+    border: 1px solid transparent; text-decoration: none; position: relative;
+  }
+  .sb-item:hover { background: rgba(255,255,255,0.04); color: var(--text); }
+  .sb-item.active { background: rgba(255,255,255,0.06); border-color: var(--border); color: white; }
+  .sb-item.active::before { content: ''; position: absolute; left: 0; top: 20%; bottom: 20%; width: 2px; border-radius: 2px; background: var(--accent); }
+  .sb-icon { width: 18px; text-align: center; font-size: 14px; opacity: 0.7; flex-shrink: 0; }
+  #sidebar-footer { margin-top: auto; padding: 12px 16px; border-top: 1px solid var(--border); }
+  #sidebar-footer p { font-size: 10px; color: var(--muted); }
+
+  #main { flex: 1; padding: 40px; overflow-y: auto; }
+  #header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 36px; }
+  #header h2 { font-size: 22px; font-weight: 300; color: white; }
+  #header h2 span { color: var(--accent); }
+
+  .perfiles-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; margin-bottom: 32px; }
+
+  .perfil-card {
+    background: var(--surface); border: 2px solid var(--border);
+    border-radius: 12px; padding: 24px 16px; cursor: pointer;
+    transition: all 0.15s; display: flex; flex-direction: column;
+    align-items: center; gap: 10px; position: relative;
+    text-align: center;
+  }
+  .perfil-card:hover { border-color: rgba(124,58,237,0.4); transform: translateY(-2px); }
+  .perfil-card.activo { border-color: var(--accent); background: rgba(124,58,237,0.08); }
+  .perfil-card.activo::after {
+    content: '✓'; position: absolute; top: 10px; right: 12px;
+    font-size: 12px; color: var(--accent);
+  }
+
+  .perfil-avatar {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: var(--surface2); border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; overflow: hidden; flex-shrink: 0;
+  }
+  .perfil-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  .perfil-nombre { font-size: 14px; font-weight: 500; color: white; }
+  .perfil-fecha { font-size: 10px; color: var(--muted); }
+
+  .perfil-actions { display: flex; gap: 6px; margin-top: 4px; }
+  .btn-sm {
+    font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); font-family: 'Segoe UI', sans-serif;
+    transition: all 0.15s;
+  }
+  .btn-sm:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+  .btn-sm.danger:hover { color: #ef4444; border-color: rgba(239,68,68,0.4); }
+  .btn-sm.primary { background: var(--accent); border-color: var(--accent); color: white; }
+  .btn-sm.primary:hover { opacity: 0.85; }
+
+  .perfil-card.nuevo {
+    border-style: dashed; color: var(--muted);
+    justify-content: center; min-height: 180px;
+  }
+  .perfil-card.nuevo:hover { color: var(--accent); border-color: var(--accent); }
+  .perfil-card.nuevo .plus { font-size: 32px; margin-bottom: 4px; }
+
+  .perfil-card.invitado { border-color: rgba(255,255,255,0.1); }
+  .perfil-card.invitado:hover { border-color: rgba(255,255,255,0.25); }
+
+  /* Modal */
+  #modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  #modal-overlay.open { display: flex; }
+  #modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 28px; width: 360px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  #modal h3 { font-size: 16px; font-weight: 500; color: white; }
+  .modal-field { display: flex; flex-direction: column; gap: 6px; }
+  .modal-field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .modal-input {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px; color: white;
+    font-size: 13px; font-family: 'Segoe UI', sans-serif; outline: none;
+    transition: border-color 0.15s;
+  }
+  .modal-input:focus { border-color: var(--accent); }
+  .emoji-grid { display: flex; flex-wrap: wrap; gap: 6px; }
+  .emoji-opt {
+    width: 36px; height: 36px; border-radius: 6px; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; background: var(--surface2); border: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .emoji-opt:hover { border-color: var(--border); }
+  .emoji-opt.selected { border-color: var(--accent); background: rgba(124,58,237,0.15); }
+  .modal-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 4px; }
+  .section-title {
+    font-size: 11px; color: var(--accent); text-transform: uppercase;
+    letter-spacing: 0.1em; margin-bottom: 14px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <div id="accent-bar"></div>
+    <h1>AtsukiBrowser</h1>
+    <p>v1.0.0</p>
+  </div>
+  <div class="sb-section">
+    <div class="sb-section-label">Herramientas</div>
+    <a class="sb-item" onclick="window.chrome.webview.postMessage('navigate:favoritos'); return false;" href="#">
+      <span class="sb-icon">⭐</span> Favoritos
+    </a>
+    <a class="sb-item" onclick="window.chrome.webview.postMessage('navigate:historial'); return false;" href="#">
+      <span class="sb-icon">🕐</span> Historial
+    </a>
+    <a class="sb-item active" href="#"><span class="sb-icon">👤</span> Perfiles</a>
+  </div>
+  <div class="sb-section">
+    <div class="sb-section-label">Ajustes</div>
+    <a class="sb-item" onclick="window.chrome.webview.postMessage('navigate:ajustes'); return false;" href="#">
+      <span class="sb-icon">🎨</span> Apariencia
+    </a>
+  </div>
+  <div id="sidebar-footer"><p>AtsukiBrowser · v1.0.0</p></div>
+</div>
+
+<div id="main">
+  <div id="header">
+    <h2>Gestión de <span>perfiles</span></h2>
+  </div>
+
+  <div class="section-title">Perfiles</div>
+  <div class="perfiles-grid" id="grid"></div>
+
+  <div class="section-title">Sesión especial</div>
+  <div class="perfiles-grid">
+    <div class="perfil-card invitado" onclick="entrarInvitado()">
+      <div class="perfil-avatar">🕶</div>
+      <div class="perfil-nombre">Modo invitado</div>
+      <div class="perfil-fecha">Sin guardar datos</div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal crear/editar -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h3 id="modal-titulo">Nuevo perfil</h3>
+    <div class="modal-field">
+      <label>Nombre</label>
+      <input class="modal-input" id="modal-nombre" type="text" placeholder="Mi perfil" maxlength="24"/>
+    </div>
+    <div class="modal-field">
+      <label>Foto de perfil (opcional)</label>
+      <div style="display:flex; align-items:center; gap:10px;">
+        <div id="modal-preview" style="
+          width:48px; height:48px; border-radius:50%;
+          background:var(--surface2); border:2px solid var(--border);
+          display:flex; align-items:center; justify-content:center;
+          font-size:22px; overflow:hidden; flex-shrink:0;
+        ">👤</div>
+        <button class="btn-sm" onclick="elegirImagen()">Elegir imagen…</button>
+        <button class="btn-sm danger" onclick="quitarImagen()">Quitar</button>
+      </div>
+    </div>
+    <div class="modal-field">
+      <label>Emoji (si no hay foto)</label>
+      <div class="emoji-grid" id="emoji-grid"></div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-sm" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn-sm primary" onclick="guardarModal()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const EMOJIS = ['👤','⭐','🎮','🎨','💼','📚','🎵','🌙','🔥','❄️','🌸','⚡','🐱','🦊','🐺','🌍'];
+
+  let iconoSeleccionado = '';
+  let datos = { activo: null, perfiles: [] };
+  let modalModo = 'crear';
+  let modalEditId = '';
+  let emojiSeleccionado = '👤';
+
+  function hexToRgba(hex, alpha) {
+    hex = hex.replace('#','');
+    const r = parseInt(hex.slice(0,2),16);
+    const g = parseInt(hex.slice(2,4),16);
+    const b = parseInt(hex.slice(4,6),16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  function aplicarTema(t) {
+    const root = document.documentElement;
+    root.style.setProperty('--accent',   t.Accent   ?? t.accent);
+    root.style.setProperty('--bg',       t.Bg       ?? t.bg);
+    root.style.setProperty('--surface',  t.Surface  ?? t.surface);
+    root.style.setProperty('--surface2', t.Surface2 ?? t.surface2);
+    root.style.setProperty('--border',   hexToRgba(t.Accent ?? t.accent, 0.25));
+  }
+
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw === 'string' && raw.startsWith('perfiles:')) {
+      console.log('perfiles recibido:', raw.slice('perfiles:'.length));  // ← añade esta línea
+      datos = JSON.parse(raw.slice('perfiles:'.length));
+      renderizar();
+    }
+    if (typeof raw === 'string' && raw.startsWith('tema:')) {
+      aplicarTema(JSON.parse(raw.slice('tema:'.length)));
+    }
+  });
+
+  function renderizar() {
+    const grid = document.getElementById('grid');
+    const esInvitadoActivo = datos.activo?.Id === 'invitado' || datos.activo?.id === 'invitado';
+    grid.innerHTML = '';
+
+    if (esInvitadoActivo) {
+      const banner = document.createElement('div');
+      banner.style.cssText = `
+        grid-column: 1 / -1; padding: 10px 14px; border-radius: 8px; margin-bottom: 4px;
+        background: rgba(100,100,120,0.15); border: 1px solid rgba(255,255,255,0.1);
+        font-size: 12px; color: rgba(255,255,255,0.5); display: flex; align-items: center; gap: 8px;
+      `;
+      banner.innerHTML = `<span>🕶</span> Estás navegando en <strong style="color:rgba(255,255,255,0.7)">modo invitado.</strong> Tu historial, favoritos, extensiones y datos de navegación no se guardarán.`;
+      grid.appendChild(banner);
+    }
+
+    datos.perfiles.forEach(p => {
+      const esActivo = datos.activo?.id === p.id;
+      const id = p.Id ?? p.id;
+      const nombre = p.Nombre ?? p.nombre;
+      const emoji = p.Emoji ?? p.emoji ?? '👤';
+      const icono = p.Icono ?? p.icono ?? '';
+      const fecha = new Date(p.CreadoEn ?? p.creadoEn ?? Date.now());
+      const fechaStr = fecha.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
+
+      const card = document.createElement('div');
+      card.className = 'perfil-card' + (esActivo ? ' activo' : '');
+      card.innerHTML = `
+        <div class="perfil-avatar">${icono ? `<img src="${icono.startsWith('/') ? 'file://' : 'file:///'}${icono}">` : emoji}</div>
+        <div class="perfil-nombre">${nombre}</div>
+        <div class="perfil-fecha">${(esActivo && !esInvitadoActivo) ? 'Activo' : fechaStr}</div>
+        <div class="perfil-actions">
+          ${(!esActivo || esInvitadoActivo) ? `<button class="btn-sm primary" onclick="cambiar('${id}')">Usar</button>` : ''}
+          <button class="btn-sm" onclick="editar('${id}','${nombre}','${emoji}','${icono}')">Editar</button>
+          ${id !== 'default' ? `<button class="btn-sm danger" onclick="eliminar('${id}')">Eliminar</button>` : ''}
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+
+    // Card nuevo perfil
+    const nuevo = document.createElement('div');
+    nuevo.className = 'perfil-card nuevo';
+    nuevo.innerHTML = `<div class="plus">+</div><div>Nuevo perfil</div>`;
+    nuevo.addEventListener('click', abrirModalCrear);
+    grid.appendChild(nuevo);
+  }
+
+  function cambiar(id) {
+    window.chrome.webview.postMessage('perfil:cambiar:' + id);
+  }
+
+  function eliminar(id) {
+    if (confirm('¿Eliminar este perfil? Se borrarán todos sus datos.'))
+      window.chrome.webview.postMessage('perfil:eliminar:' + id);
+  }
+
+  function entrarInvitado() {
+    window.chrome.webview.postMessage('perfil:invitado');
+  }
+
+  // ── Modal ────────────────────────────────────────────
+  function iniciarEmojiGrid(seleccionado) {
+    emojiSeleccionado = seleccionado;
+    const grid = document.getElementById('emoji-grid');
+    grid.innerHTML = '';
+    EMOJIS.forEach(em => {
+      const div = document.createElement('div');
+      div.className = 'emoji-opt' + (em === seleccionado ? ' selected' : '');
+      div.textContent = em;
+      div.addEventListener('click', () => {
+        emojiSeleccionado = em;
+        grid.querySelectorAll('.emoji-opt').forEach(d => d.classList.remove('selected'));
+        div.classList.add('selected');
+      });
+      grid.appendChild(div);
+    });
+  }
+
+  function abrirModalCrear() {
+    modalModo = 'crear';
+    iconoSeleccionado = '';
+    document.getElementById('modal-titulo').textContent = 'Nuevo perfil';
+    document.getElementById('modal-nombre').value = '';
+    actualizarPreview('👤', '');
+    iniciarEmojiGrid('👤');
+    document.getElementById('modal-overlay').classList.add('open');
+  }
+
+  function editar(id, nombre, emoji, icono) {
+    modalModo = 'editar';
+    modalEditId = id;
+    iconoSeleccionado = icono || '';
+    document.getElementById('modal-titulo').textContent = 'Editar perfil';
+    document.getElementById('modal-nombre').value = nombre;
+    actualizarPreview(emoji, icono);
+    iniciarEmojiGrid(emoji);
+    document.getElementById('modal-overlay').classList.add('open');
+  }
+
+  function cerrarModal() {
+    document.getElementById('modal-overlay').classList.remove('open');
+  }
+
+  function actualizarPreview(emoji, icono) {
+    const prev = document.getElementById('modal-preview');
+    if (icono) {
+      const src = icono.startsWith('/') ? `file://${icono}` : `file:///${icono}`;
+      prev.innerHTML = `<img src="${src}" style="width:100%;height:100%;object-fit:cover;">`;
+    } else {
+      prev.textContent = emoji || '👤';
+    }
+  }
+
+  function elegirImagen() {
+    window.chrome.webview.postMessage('perfil:elegir-imagen');
+  }
+
+  function quitarImagen() {
+    iconoSeleccionado = '';
+    actualizarPreview(emojiSeleccionado, '');
+  }
+
+  function guardarModal() {
+    const nombre = document.getElementById('modal-nombre').value.trim();
+    if (!nombre) return;
+
+    if (modalModo === 'crear') {
+      window.chrome.webview.postMessage('perfil:crear:' + JSON.stringify({
+        nombre, emoji: emojiSeleccionado, icono: iconoSeleccionado
+      }));
+    } else {
+      window.chrome.webview.postMessage('perfil:editar:' + JSON.stringify({
+        id: modalEditId, nombre, emoji: emojiSeleccionado, icono: iconoSeleccionado
+      }));
+    }
+    cerrarModal();
+  }
+
+  document.getElementById('modal-overlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-overlay')) cerrarModal();
+  });
+
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw === 'string' && raw.startsWith('perfil:imagen:')) {
+      iconoSeleccionado = raw.slice('perfil:imagen:'.length);
+      actualizarPreview(emojiSeleccionado, iconoSeleccionado);
+    }
+  });
+
+  window.chrome.webview.postMessage('get:perfiles');
+  window.chrome.webview.postMessage('get:tema');
+</script>
+</body>
+</html>

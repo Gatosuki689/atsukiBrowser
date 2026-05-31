@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Ajustes</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --accent: #7c3aed;
+    --bg: #0d0d14;
+    --surface: #13131f;
+    --surface2: #1a1a2e;
+    --border: rgba(124,58,237,0.25);
+    --text: rgba(255,255,255,0.85);
+    --muted: rgba(255,255,255,0.35);
+    --font: 'Segoe UI', sans-serif;
+  }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    }
+
+  #main {
+        padding: 40px;
+        max-width: 860px;
+    }
+
+  #main {
+  padding: 40px 40px 40px 32px;
+    }
+
+  /* ── Secciones ── */
+  .section { margin-bottom: 40px; }
+  .section-title {
+    font-size: 11px; color: var(--accent); text-transform: uppercase;
+    letter-spacing: 0.1em; margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+
+  /* ── Grid de temas predefinidos ── */
+  .temas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+  }
+
+  .tema-card {
+    border-radius: 8px; border: 2px solid transparent;
+    cursor: pointer; overflow: hidden;
+    transition: all 0.15s; position: relative;
+  }
+  .tema-card:hover { transform: translateY(-2px); }
+  .tema-card.selected { border-color: var(--accent); }
+  .tema-card.selected::after {
+    content: '✓';
+    position: absolute; top: 6px; right: 8px;
+    font-size: 12px; color: white;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+  }
+
+  .tema-preview {
+    height: 64px;
+    display: flex; align-items: flex-end;
+    padding: 8px;
+    position: relative;
+  }
+  .tema-preview-bar {
+    height: 4px; width: 40%; border-radius: 2px;
+  }
+  .tema-name {
+    padding: 8px 10px;
+    font-size: 11px; font-weight: 500;
+  }
+
+  /* ── Editor custom ── */
+  .custom-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+  .color-row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px; height: 40px;
+  }
+  .color-row input[type="color"] {
+    width: 24px; height: 24px; border: none; border-radius: 4px;
+    cursor: pointer; background: none; padding: 0;
+  }
+  .color-row input[type="text"] {
+    flex: 1; background: none; border: none; outline: none;
+    color: var(--text); font-size: 13px; font-family: var(--font);
+  }
+
+  .font-select {
+    width: 100%; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 6px; padding: 0 12px; height: 40px;
+    color: var(--text); font-size: 13px; font-family: var(--font);
+    outline: none; cursor: pointer;
+    grid-column: 1 / -1;
+  }
+  .font-select option { background: #1a1a2e; }
+
+  .btn-aplicar {
+    margin-top: 6px;
+    background: var(--accent); border: none; border-radius: 6px;
+    color: white; font-size: 13px; font-family: var(--font);
+    padding: 10px 24px; cursor: pointer;
+    transition: opacity 0.15s; grid-column: 1 / -1;
+  }
+  .btn-aplicar:hover { opacity: 0.85; }
+
+  /* ── Preview live ── */
+  #preview-wrap { margin-top: 20px; }
+  #preview-label { font-size: 11px; color: var(--muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  #preview-box {
+    border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border);
+  }
+  #preview-topbar {
+    height: 32px; display: flex; align-items: center;
+    padding: 0 12px; gap: 8px;
+  }
+  #preview-dot { width: 8px; height: 8px; border-radius: 50%; }
+  #preview-url {
+    flex: 1; height: 18px; border-radius: 3px;
+    opacity: 0.3;
+  }
+  #preview-body {
+    height: 80px; display: flex; align-items: center;
+    justify-content: center; gap: 12px; padding: 16px;
+  }
+  #preview-card {
+    flex: 1; height: 48px; border-radius: 6px;
+    border: 1px solid; opacity: 0.6;
+  }
+  #preview-btn {
+    height: 32px; width: 80px; border-radius: 4px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: white; font-weight: 500;
+  }
+  body {
+    display: flex;
+    }
+
+#sidebar {
+    width: 240px;
+    min-width: 240px;
+    height: 100vh;
+    position: sticky;
+    top: 0;
+    background: #0a0a10;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    }
+
+#sidebar-header {
+    padding: 20px 16px 12px;
+    border-bottom: 1px solid var(--border);
+    }
+
+#accent-bar {
+    width: 32px; height: 2px;
+    background: var(--accent);
+    border-radius: 2px;
+    margin-bottom: 8px;
+    }
+
+#sidebar-header h1 {
+    font-size: 15px; font-weight: 700;
+    color: white; letter-spacing: 0.05em;
+    text-transform: uppercase;
+    }
+
+#sidebar-header p {
+    font-size: 11px; color: var(--muted);
+    margin-top: 2px;
+    }
+
+.sb-section {
+    padding: 16px 8px 4px;
+    }
+
+.sb-section-label {
+    font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.12em;
+    padding: 0 8px; margin-bottom: 4px;
+    }
+
+.sb-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border-radius: 6px;
+    cursor: pointer; font-size: 13px; color: var(--muted);
+    transition: all 0.15s; border: 1px solid transparent;
+    text-decoration: none; position: relative;
+    }
+
+.sb-item:hover {
+    background: rgba(255,255,255,0.04);
+    color: var(--text);
+    }
+
+.sb-item.active {
+    background: rgba(255,255,255,0.06);
+    border-color: var(--border);
+    color: white;
+    }
+
+.sb-item.active::before {
+    content: '';
+    position: absolute; left: 0; top: 20%; bottom: 20%;
+    width: 2px; border-radius: 2px;
+    background: var(--accent);
+    }
+
+.sb-icon {
+    width: 18px; text-align: center;
+    font-size: 14px; opacity: 0.7;
+    flex-shrink: 0;
+    }
+
+.sb-item.active .sb-icon { opacity: 1; }
+
+#sidebar-footer {
+    margin-top: auto;
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    }
+
+#sidebar-footer p { font-size: 10px; color: var(--muted); }
+
+/* ── Fondo ── */
+#fondo-preview-wrap { margin-bottom: 4px; }
+#fondo-preview {
+  width: 100%; height: 140px;
+  border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface2);
+  overflow: hidden; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+#fondo-preview-img {
+  width: 100%; height: 100%;
+  object-fit: cover; display: none;
+}
+#fondo-preview-empty {
+  font-size: 12px; color: var(--muted);
+}
+.btn-fondo {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text);
+  font-size: 12px; font-family: var(--font);
+  padding: 9px 18px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-fondo:hover {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(124,58,237,0.06);
+}
+.btn-fondo-danger:hover {
+  border-color: rgba(239,68,68,0.5); color: #ef4444;
+  background: rgba(239,68,68,0.06);
+}
+input[type="range"] {
+  width: 100%; accent-color: var(--accent);
+  height: 4px; cursor: pointer;
+}
+
+/* ── Sidebar editor ── */
+#sidebar-items-list {
+  display: flex; flex-direction: column; gap: 6px;
+}
+.sb-edit-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 12px;
+  transition: border-color 0.15s;
+}
+.sb-edit-item:hover { border-color: var(--accent); }
+.sb-edit-emoji { font-size: 18px; width: 28px; text-align: center; flex-shrink: 0; }
+.sb-edit-name { flex: 1; font-size: 13px; color: var(--text); }
+.sb-edit-url { font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+.sb-edit-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.sb-edit-btn {
+  background: none; border: 1px solid var(--border);
+  border-radius: 4px; color: var(--muted);
+  font-size: 12px; padding: 3px 8px; cursor: pointer;
+  transition: all 0.15s;
+}
+.sb-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+.sb-edit-btn.danger:hover { border-color: #ef4444; color: #ef4444; }
+.sb-edit-btn.up:hover, .sb-edit-btn.down:hover { border-color: var(--accent); color: var(--accent); }
+.sb-sep-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 12px; opacity: 0.5;
+  font-size: 11px; color: var(--muted);
+}
+
+.sb-widget-toggle {
+  width: 36px; height: 20px; border-radius: 10px;
+  background: rgba(255,255,255,0.1); border: none;
+  cursor: pointer; position: relative;
+  transition: background 0.2s; flex-shrink: 0;
+}
+.sb-widget-toggle.on { background: var(--accent); }
+.sb-widget-toggle::after {
+  content: ''; position: absolute;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: white; top: 3px; left: 3px;
+  transition: left 0.2s;
+}
+.sb-widget-toggle.on::after { left: 19px; }
+
+/* ── Rendimiento ── */
+.perf-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+}
+.perf-label { font-size: 13px; color: var(--text); }
+.perf-desc  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+.radio-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border-radius: 8px;
+  background: var(--surface2); border: 1px solid var(--border);
+  font-size: 13px; color: var(--text); cursor: pointer;
+}
+.radio-row input[type=radio] { accent-color: var(--accent); width: 15px; height: 15px; }
+
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="sidebar-header">
+    <div id="accent-bar"></div>
+    <h1>AtsukiBrowser</h1>
+    <p>v1.0.0</p>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-label">Herramientas</div>
+    <a class="sb-item" onclick="window.chrome.webview.postMessage('navigate:favoritos'); return false;" href="#">
+      <span class="sb-icon">⭐</span> Favoritos
+    </a>
+    <a class="sb-item" onclick="window.chrome.webview.postMessage('navigate:historial'); return false;" href="#">
+      <span class="sb-icon">🕐</span> Historial
+    </a>
+    <a class="sb-item" id="sb-perfiles" href="#">
+      <span class="sb-icon">👤</span> Perfiles
+    </a>
+  </div>
+
+  <div class="sb-section">
+    <div class="sb-section-label">Ajustes</div>
+    <a class="sb-item active" href="#" onclick="mostrarSeccion('apariencia'); return false;">
+      <span class="sb-icon">🎨</span> Apariencia
+    </a>
+    <a class="sb-item" href="#" onclick="mostrarSeccion('widgets'); return false;">
+      <span class="sb-icon">⊞</span> Widgets
+    </a>
+    <a class="sb-item" href="#" onclick="mostrarSeccion('sidebar'); return false;">
+      <span class="sb-icon">◧</span> Sidebar
+    </a>
+    <a class="sb-item" href="#" onclick="mostrarSeccion('atajos'); return false;">
+      <span class="sb-icon">⌨</span> Atajos
+    </a>
+    <a class="sb-item" href="#" onclick="mostrarSeccion('rendimiento'); return false;">
+      <span class="sb-icon">⚡</span> Rendimiento
+    </a>
+    <a class="sb-item" href="#" onclick="mostrarSeccion('buscador'); return false;">
+      <span class="sb-icon">🔍</span> Buscador
+    </a>
+    <a class="sb-item" href="#" onclick="mostrarSeccion('privacidad'); return false;">
+      <span class="sb-icon">🔒</span> Privacidad
+    </a>
+    <a class="sb-item" href="#" onclick="mostrarSeccion('datos'); return false;">
+      <span class="sb-icon">💾</span> Datos y respaldo
+    </a>
+    <a class="sb-item" href="#" onclick="mostrarSeccion('actualizaciones'); return false;">
+      <span class="sb-icon">🔄</span><span class="sb-label">Actualizaciones</span>
+    </a>
+  </div>
+
+  <div id="sidebar-footer">
+    <p>AtsukiBrowser · v1.0.0</p>
+  </div>
+</div>
+
+<div id="main">
+
+  <!-- ── Apariencia ── -->
+  <div id="seccion-apariencia">
+    <div id="header">
+      <h2>Ajustes — <span>Apariencia</span></h2>
+      <p>Personaliza la apariencia del navegador</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Temas predefinidos</div>
+      <div class="temas-grid" id="temas-grid"></div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Editor personalizado</div>
+      <div class="custom-grid">
+        <div class="field">
+          <label>Color de acento</label>
+          <div class="color-row">
+            <input type="color" id="c-accent" value="#7c3aed"/>
+            <input type="text"  id="t-accent" value="#7c3aed" maxlength="7"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Fondo principal</label>
+          <div class="color-row">
+            <input type="color" id="c-bg" value="#0d0d14"/>
+            <input type="text"  id="t-bg" value="#0d0d14" maxlength="7"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Superficie</label>
+          <div class="color-row">
+            <input type="color" id="c-surface" value="#13131f"/>
+            <input type="text"  id="t-surface" value="#13131f" maxlength="7"/>
+          </div>
+        </div>
+        <div class="field">
+          <label>Superficie 2</label>
+          <div class="color-row">
+            <input type="color" id="c-surface2" value="#1a1a2e"/>
+            <input type="text"  id="t-surface2" value="#1a1a2e" maxlength="7"/>
+          </div>
+        </div>
+        <div class="field" style="grid-column: 1 / -1">
+          <label>Tipografía</label>
+          <select class="font-select" id="s-font">
+            <option value="Segoe UI">Segoe UI (default)</option>
+            <option value="Inter">Inter</option>
+            <option value="JetBrains Mono">JetBrains Mono</option>
+            <option value="Consolas">Consolas</option>
+            <option value="Arial">Arial</option>
+            <option value="Georgia">Georgia</option>
+          </select>
+        </div>
+        <button class="btn-aplicar" onclick="aplicarCustom()">Aplicar tema personalizado</button>
+      </div>
+      <div id="preview-wrap">
+        <div id="preview-label">Vista previa</div>
+        <div id="preview-box">
+          <div id="preview-topbar">
+            <div id="preview-dot"></div>
+            <div id="preview-url"></div>
+          </div>
+          <div id="preview-body">
+            <div id="preview-card"></div>
+            <div id="preview-btn">Acento</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Widgets ── -->
+  <div id="seccion-widgets" style="display:none">
+    <div id="header">
+      <h2>Ajustes — <span>Widgets</span></h2>
+      <p>Gestiona los widgets de la nueva pestaña y el sidebar</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Fondo de nueva pestaña</div>
+      <div id="fondo-preview-wrap">
+        <div id="fondo-preview">
+          <img id="fondo-preview-img" alt="" />
+          <span id="fondo-preview-empty">Sin fondo configurado</span>
+        </div>
+      </div>
+      <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
+        <button class="btn-fondo" id="btn-elegir-fondo">🖼 Elegir imagen</button>
+        <button class="btn-fondo btn-fondo-danger" id="btn-quitar-fondo">✕ Quitar fondo</button>
+      </div>
+      <div class="field" style="margin-top:18px">
+        <label>Transparencia de widgets <span id="opac-value">35%</span></label>
+        <input type="range" id="slider-opac" min="0" max="80" value="35" />
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Widgets del sidebar</div>
+      <div style="display:flex; flex-direction:column; gap:10px;" id="sb-widgets-lista">
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px;
+          background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+          <div>
+            <div style="font-size:13px; color:var(--text)">⚡ Rendimiento</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px">CPU, RAM, Disco y Red</div>
+          </div>
+          <button class="sb-widget-toggle on" data-sbwidget="rendimiento"></button>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px;
+          background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+          <div>
+            <div style="font-size:13px; color:var(--text)">🕐 Reloj</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px">Hora y fecha en el sidebar</div>
+          </div>
+          <button class="sb-widget-toggle on" data-sbwidget="reloj"></button>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px;
+          background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+          <div>
+            <div style="font-size:13px; color:var(--text)">📸 Capturas de pantalla</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px">Acceso rápido a capturas</div>
+          </div>
+          <button class="sb-widget-toggle on" data-sbwidget="capturas"></button>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 14px;
+          background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+          <div>
+            <div style="font-size:13px; color:var(--text)">🔍 Búsqueda rápida</div>
+            <div style="font-size:11px; color:var(--muted); margin-top:2px">Buscar sin abrir nueva pestaña</div>
+          </div>
+          <button class="sb-widget-toggle on" data-sbwidget="busqueda"></button>
+        </div>
+        <div id="sb-ext-widgets"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Sidebar ── -->
+  <div id="seccion-sidebar" style="display:none">
+    <div id="header">
+      <h2>Ajustes — <span>Sidebar</span></h2>
+      <p>Organiza y personaliza el sidebar del navegador</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Elementos del sidebar</div>
+      <div id="sidebar-editor">
+        <div id="sidebar-items-list"></div>
+        <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+          <button class="btn-fondo" id="btn-add-sidebar">+ Agregar enlace</button>
+          <button class="btn-fondo" id="btn-reset-sidebar">↺ Restaurar por defecto</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Atajos ── -->
+  <div id="seccion-atajos" style="display:none">
+    <div id="header">
+      <h2>Ajustes — <span>Atajos</span></h2>
+      <p>Personaliza los atajos de teclado</p>
+    </div>
+
+    <div class="section">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+        <div class="section-title" style="margin-bottom:0; border:none; padding:0">Atajos de teclado</div>
+        <button class="btn-aplicar" style="padding:6px 14px; font-size:11px; margin:0"
+          onclick="restablecerTodos()">Restablecer todos</button>
+    </div>
+
+      <div id="atajos-lista" style="display:flex; flex-direction:column; gap:6px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Rendimiento ── -->
+  <div id="seccion-rendimiento" style="display:none">
+    <div>
+      <h2 style="font-size:22px; font-weight:300; color:white; margin-bottom:8px">
+        Ajustes — <span style="color:var(--accent)">Rendimiento</span>
+      </h2>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:28px">Optimiza el uso de recursos</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Rendimiento</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Suspender tabs inactivas</div>
+            <div class="perf-desc">Congela tabs en segundo plano para liberar CPU y RAM</div>
+          </div>
+          <button class="sb-widget-toggle on" data-perf="suspender_tabs"></button>
+          <div class="perf-row">
+            <div>
+              <div class="perf-label">Pausar media en pestañas inactivas</div>
+              <div class="perf-desc">Pausa videos y audio al cambiar de pestaña (desactiva para el widget de música)</div>
+            </div>
+            <button class="sb-widget-toggle on" data-perf="suspender_media"></button>
+          </div>
+        </div>
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Liberar caché periódicamente</div>
+            <div class="perf-desc">Limpia la caché de WebView2 cada 30 minutos</div>
+          </div>
+          <button class="sb-widget-toggle" data-perf="limpiar_cache"></button>
+        </div>
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Límite de pestañas abiertas</div>
+            <div class="perf-desc">Cierra automáticamente la más antigua al superar el límite</div>
+          </div>
+          <button class="sb-widget-toggle" data-perf="limite_tabs"></button>
+        </div>
+        <div id="limite-tabs-wrap" style="display:none; padding:10px 14px;
+          background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+          <label style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">
+            Máximo de pestañas: <span id="limite-tabs-val">10</span>
+          </label>
+          <input type="range" id="slider-limite-tabs" min="3" max="20" value="10" style="margin-top:8px"/>
+        </div>
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">No restaurar tabs al iniciar</div>
+            <div class="perf-desc">Abre siempre una sola pestaña nueva al iniciar el navegador</div>
+          </div>
+          <button class="sb-widget-toggle" data-perf="no_restaurar"></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Buscador ── -->
+  <div id="seccion-buscador" style="display:none">
+    <div>
+      <h2 style="font-size:22px; font-weight:300; color:white; margin-bottom:8px">
+        Ajustes — <span style="color:var(--accent)">Buscador</span>
+      </h2>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:28px">
+        Configura el motor de búsqueda predeterminado
+      </p>
+    </div>
+    <div class="section">
+      <div class="section-title">Motor de búsqueda</div>
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        <label class="radio-row"><input type="radio" name="buscador" value="google" checked> Google</label>
+        <label class="radio-row"><input type="radio" name="buscador" value="bing"> Bing</label>
+        <label class="radio-row"><input type="radio" name="buscador" value="duckduckgo"> DuckDuckGo</label>
+        <label class="radio-row"><input type="radio" name="buscador" value="brave"> Brave Search</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Privacidad ── -->
+  <div id="seccion-privacidad" style="display:none">
+    <div>
+      <h2 style="font-size:22px; font-weight:300; color:white; margin-bottom:8px">
+        Ajustes — <span style="color:var(--accent)">Privacidad</span>
+      </h2>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:28px">
+        Gestiona tu privacidad y datos</p>
+    </div>
+    <div class="section">
+      <div class="section-title">Datos de navegación</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Guardar historial</div>
+            <div class="perf-desc">Registra las páginas que visitas</div>
+          </div>
+          <button class="sb-widget-toggle on" data-priv="guardar_historial"></button>
+        </div>
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Guardar favoritos</div>
+            <div class="perf-desc">Permite añadir páginas a favoritos</div>
+          </div>
+          <button class="sb-widget-toggle on" data-priv="guardar_favoritos"></button>
+        </div>
+        <button class="btn-fondo btn-fondo-danger" id="btn-borrar-historial"
+          style="margin-top:8px; width:fit-content">
+          🗑 Borrar historial ahora
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Datos y respaldo ── -->
+  <div id="seccion-datos" style="display:none">
+    <div>
+      <h2 style="font-size:22px; font-weight:300; color:white; margin-bottom:8px">
+        Ajustes — <span style="color:var(--accent)">Datos y respaldo</span>
+      </h2>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:28px">
+        Exporta o importa tu configuración y datos del perfil actual</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Configuración</div>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
+        Incluye tema, sidebar, dials, widgets, atajos y extensiones.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn-fondo" id="btn-exportar-config">📤 Exportar configuración</button>
+        <button class="btn-fondo" id="btn-importar-config">📥 Importar configuración</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Datos</div>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:14px">
+        Incluye historial, favoritos e historial de descargas.</p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn-fondo" id="btn-exportar-datos">📤 Exportar datos</button>
+        <button class="btn-fondo" id="btn-importar-datos">📥 Importar datos</button>
+      </div>
+    </div>
+
+    <div id="datos-status" style="display:none; margin-top:8px; padding:10px 14px;
+      background:var(--surface2); border:1px solid var(--border); border-radius:8px;
+      font-size:13px; color:var(--accent);">
+    </div>
+  </div>
+  <div id="seccion-actualizaciones" style="display:none">
+    <div class="section">
+      <div class="section-title">Actualizaciones</div>
+
+      <!-- Card versión actual -->
+      <div style="display:flex; align-items:center; justify-content:space-between;
+                  background:var(--surface2); border:1px solid var(--border);
+                  border-radius:12px; padding:20px 24px; margin-bottom:12px;">
+        <div>
+          <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.08em;
+                      color:var(--muted); margin-bottom:6px;">Versión instalada</div>
+          <div id="version-actual" style="font-size:22px; font-weight:600;
+                      color:var(--text); letter-spacing:-0.5px;">v1.0.0</div>
+        </div>
+        <button onclick="buscarActualizaciones()"
+                style="background:var(--accent); color:white; border:none; border-radius:8px;
+                      padding:10px 20px; font-size:12px; font-weight:500; cursor:pointer;
+                      font-family:var(--font); letter-spacing:0.02em;
+                      transition: opacity 0.15s;"
+                onmouseover="this.style.opacity='0.85'"
+                onmouseout="this.style.opacity='1'">
+          Buscar actualizaciones
+        </button>
+      </div>
+
+      <!-- Card estado -->
+      <div id="update-estado" style="display:none; border-radius:12px; padding:20px 24px;
+                                      border:1px solid var(--border); background:var(--surface2);">
+        <div id="update-titulo" style="font-size:14px; font-weight:600;
+                                        margin-bottom:8px; color:var(--text);"></div>
+        <div id="update-notas" style="font-size:12px; color:var(--muted);
+                                      margin-bottom:16px; white-space:pre-line;
+                                      line-height:1.6;"></div>
+        <button id="update-btn"
+                style="display:none; background:var(--accent); color:white;
+                      border:none; border-radius:8px; padding:10px 20px;
+                      font-size:12px; font-weight:500; cursor:pointer;
+                      font-family:var(--font); letter-spacing:0.02em;
+                      transition: opacity 0.15s;"
+                onmouseover="this.style.opacity='0.85'"
+                onmouseout="this.style.opacity='1'">
+          Actualizar ahora
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal sidebar -->
+<div id="modal-sidebar" style="display:none; position:fixed; inset:0; z-index:200;
+  background:rgba(0,0,0,0.6); align-items:center; justify-content:center;">
+  <div style="background:var(--surface2); border:1px solid var(--border);
+    border-radius:12px; padding:24px; width:320px; display:flex; flex-direction:column; gap:14px;">
+    <div style="font-size:14px; font-weight:500; color:white" id="modal-sb-title">Agregar enlace</div>
+    <div class="field">
+      <label>Emoji / Icono</label>
+      <div class="color-row">
+        <input type="text" id="sb-emoji" maxlength="4" placeholder="🌐" style="width:60px"/>
+      </div>
+    </div>
+    <div class="field">
+      <label>Nombre</label>
+      <div class="color-row">
+        <input type="text" id="sb-nombre" placeholder="Mi sitio"/>
+      </div>
+    </div>
+    <div class="field">
+      <label>URL</label>
+      <div class="color-row">
+        <input type="text" id="sb-url" placeholder="https://ejemplo.com"/>
+      </div>
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn-fondo" id="modal-sb-cancel">Cancelar</button>
+      <button class="btn-aplicar" style="margin:0; grid-column:unset; padding:8px 20px"
+        id="modal-sb-save">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Temas predefinidos ───────────────────────────────
+  const TEMAS = [
+    { id:'default',      nombre:'Por defecto',      accent:'#7c3aed', bg:'#0d0d14', surface:'#13131f', surface2:'#1a1a2e' },
+    { id:'sakura',      nombre:'Sakura',      accent:'#f472b6', bg:'#0f0a0e', surface:'#1a1118', surface2:'#241820' },
+    { id:'neon',        nombre:'Neon',        accent:'#00ffe0', bg:'#050d0d', surface:'#0a1a1a', surface2:'#0f2424' },
+    { id:'void',        nombre:'Void',        accent:'#a855f7', bg:'#05050f', surface:'#0b0b1a', surface2:'#11112a' },
+    { id:'ember',       nombre:'Ember',       accent:'#f97316', bg:'#0d0800', surface:'#1a1000', surface2:'#251800' },
+    { id:'arctic',      nombre:'Arctic',     accent:'#38bdf8', bg:'#060d14', surface:'#0d1a24', surface2:'#122030' },
+    { id:'monochrome',  nombre:'Monochrome', accent:'#e2e8f0', bg:'#0a0a0a', surface:'#141414', surface2:'#1e1e1e' },
+  ];
+
+  let temaActivoId = 'default';
+
+  function hexToRgba(hex, alpha) {
+    hex = hex.replace('#','');
+    const r = parseInt(hex.slice(0,2),16);
+    const g = parseInt(hex.slice(2,4),16);
+    const b = parseInt(hex.slice(4,6),16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  function aplicarCSSVars(t) {
+    const accent   = t.Accent   ?? t.accent;
+    const bg       = t.Bg       ?? t.bg;
+    const surface  = t.Surface  ?? t.surface;
+    const surface2 = t.Surface2 ?? t.surface2;
+    const font     = t.Font     ?? t.font;
+    
+    const root = document.documentElement;
+    root.style.setProperty('--accent',   accent);
+    root.style.setProperty('--bg',       bg);
+    root.style.setProperty('--surface',  surface);
+    root.style.setProperty('--surface2', surface2);
+    root.style.setProperty('--border',   hexToRgba(accent, 0.25));
+    if (font) root.style.setProperty('--font', `'${font}', sans-serif`);
+    
+    // Actualizar sidebar
+    const accentBar = document.getElementById('accent-bar');
+    if (accentBar) accentBar.style.background = accent;
+    document.querySelectorAll('.sb-item.active::before');
+    document.querySelectorAll('.sb-item.active').forEach(el => el.style.borderColor = hexToRgba(accent, 0.25));
+    
+    actualizarPreview({ accent, bg, surface, surface2 });
+}
+
+  function actualizarSidebarAccent(accent) {
+    // Reemplaza colores hardcodeados del sidebar con el accent actual
+    document.querySelectorAll('.sidebar-item:hover, .sidebar-item.active').forEach(el => {
+      el.style.color = accent;
+    });
+    document.getElementById('accent-bar').style.background =
+      `linear-gradient(90deg, ${accent}, transparent)`;
+    document.querySelectorAll('#brand h1').forEach(el => el.style.color = accent);
+  }
+
+  function actualizarPreview(t) {
+    const box      = document.getElementById('preview-box');
+    const topbar   = document.getElementById('preview-topbar');
+    const dot      = document.getElementById('preview-dot');
+    const urlBar   = document.getElementById('preview-url');
+    const body     = document.getElementById('preview-body');
+    const card     = document.getElementById('preview-card');
+    const btn      = document.getElementById('preview-btn');
+
+    box.style.background    = t.bg;
+    topbar.style.background = t.surface;
+    dot.style.background    = t.accent;
+    urlBar.style.background = t.surface2;
+    body.style.background   = t.bg;
+    card.style.background   = t.surface;
+    card.style.borderColor  = hexToRgba(t.accent, 0.25);
+    btn.style.background    = t.accent;
+  }
+
+  function renderTemas() {
+    const grid = document.getElementById('temas-grid');
+    grid.innerHTML = '';
+    TEMAS.forEach(t => {
+      const card = document.createElement('div');
+      card.className = 'tema-card' + (t.id === temaActivoId ? ' selected' : '');
+      card.innerHTML = `
+        <div class="tema-preview" style="background:${t.bg}">
+          <div class="tema-preview-bar" style="background:${t.accent}"></div>
+        </div>
+        <div class="tema-name" style="background:${t.surface}; color:rgba(255,255,255,0.8)">${t.nombre}</div>
+      `;
+      card.addEventListener('click', () => {
+        temaActivoId = t.id;
+        ignorarProximoTema = true; 
+        document.querySelectorAll('.tema-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        aplicarCSSVars(t);
+        window.chrome.webview.postMessage('tema:predefinido:' + t.id);
+      });
+      grid.appendChild(card);
+    });
+
+    // Card de tema custom si está activo
+    if (temaActivoId === 'custom') {
+      const accent   = document.getElementById('c-accent').value;
+      const bg       = document.getElementById('c-bg').value;
+      const surface  = document.getElementById('c-surface').value;
+      const card = document.createElement('div');
+      card.className = 'tema-card selected';
+      card.innerHTML = `
+        <div class="tema-preview" style="background:${bg}">
+          <div class="tema-preview-bar" style="background:${accent}"></div>
+        </div>
+        <div class="tema-name" style="background:${surface}; color:rgba(255,255,255,0.8)">✏ Custom</div>
+      `;
+      grid.appendChild(card);
+    }
+  }
+
+  // ── Editor custom ────────────────────────────────────
+  function sincronizarColorTexto(colorId, textId) {
+    const c = document.getElementById(colorId);
+    const t = document.getElementById(textId);
+    c.addEventListener('input', () => {
+      t.value = c.value;
+      previewCustomLive();
+    });
+    t.addEventListener('input', () => {
+      if (/^#[0-9a-fA-F]{6}$/.test(t.value)) {
+        c.value = t.value;
+        previewCustomLive();
+      }
+    });
+  }
+
+  function previewCustomLive() {
+    actualizarPreview({
+      accent:   document.getElementById('c-accent').value,
+      bg:       document.getElementById('c-bg').value,
+      surface:  document.getElementById('c-surface').value,
+      surface2: document.getElementById('c-surface2').value,
+    });
+  }
+
+  function aplicarCustom() {
+    ignorarProximoTema = true; 
+    const tema = {
+      Accent:   document.getElementById('c-accent').value,
+      Bg:       document.getElementById('c-bg').value,
+      Surface:  document.getElementById('c-surface').value,
+      Surface2: document.getElementById('c-surface2').value,
+      Font:     document.getElementById('s-font').value,
+    };
+    temaActivoId = 'custom';
+    document.querySelectorAll('.tema-card').forEach(c => c.classList.remove('selected'));
+    aplicarCSSVars(tema);
+    window.chrome.webview.postMessage('tema:custom:' + JSON.stringify(tema));
+  }
+
+  // ── Recibir tema desde C# ────────────────────────────
+  let ignorarProximoTema = false;
+
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw === 'string' && raw.startsWith('tema:')) {
+      if (ignorarProximoTema) {
+        ignorarProximoTema = false;
+        return;
+      }
+      const t = JSON.parse(raw.slice('tema:'.length));
+      temaActivoId = t.Id ?? t.id ?? 'default';
+
+      const accent   = t.Accent   ?? t.accent   ?? '#7c3aed';
+      const bg       = t.Bg       ?? t.bg       ?? '#0d0d14';
+      const surface  = t.Surface  ?? t.surface  ?? '#13131f';
+      const surface2 = t.Surface2 ?? t.surface2 ?? '#1a1a2e';
+      const font     = t.Font     ?? t.font     ?? 'Segoe UI';
+
+      document.getElementById('c-accent').value   = accent;
+      document.getElementById('t-accent').value   = accent;
+      document.getElementById('c-bg').value       = bg;
+      document.getElementById('t-bg').value       = bg;
+      document.getElementById('c-surface').value  = surface;
+      document.getElementById('t-surface').value  = surface;
+      document.getElementById('c-surface2').value = surface2;
+      document.getElementById('t-surface2').value = surface2;
+
+      const fontSelect = document.getElementById('s-font');
+      if (fontSelect) {
+        const opt = Array.from(fontSelect.options).find(o => o.value === font);
+        if (opt) fontSelect.value = font;
+      }
+
+      aplicarCSSVars(t);
+      actualizarPreview({ accent, bg, surface, surface2 });
+      renderTemas();
+    }
+  });
+
+  // ── Init ─────────────────────────────────────────────
+  sincronizarColorTexto('c-accent',  't-accent');
+  sincronizarColorTexto('c-bg',      't-bg');
+  sincronizarColorTexto('c-surface', 't-surface');
+  sincronizarColorTexto('c-surface2','t-surface2');
+
+  renderTemas();
+  previewCustomLive();
+  window.chrome.webview.postMessage('get:tema');
+
+  // ── Fondo ─────────────────────────────────────────────
+  let opacidadActual = 35;
+
+  function mostrarFondoPreview(ruta) {
+    const img   = document.getElementById('fondo-preview-img');
+    const empty = document.getElementById('fondo-preview-empty');
+    if (ruta) {
+      img.src = 'file:///' + ruta;
+      img.style.display = 'block';
+      empty.style.display = 'none';
+    } else {
+      img.src = '';
+      img.style.display = 'none';
+      empty.style.display = 'block';
+    }
+  }
+
+  document.getElementById('btn-elegir-fondo').addEventListener('click', () => {
+    window.chrome.webview.postMessage('fondo:elegir');
+  });
+
+  document.getElementById('btn-quitar-fondo').addEventListener('click', () => {
+    mostrarFondoPreview('');
+    window.chrome.webview.postMessage('fondo:quitar');
+  });
+
+  // Slider de transparencia
+  const slider = document.getElementById('slider-opac');
+  const opacLabel = document.getElementById('opac-value');
+
+  slider.addEventListener('input', () => {
+    opacidadActual = parseInt(slider.value);
+    opacLabel.textContent = opacidadActual + '%';
+    window.chrome.webview.postMessage('fondo:opacidad:' + opacidadActual);
+  });
+
+  // Recibir fondo desde C#
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string') return;
+    if (raw.startsWith('fondo:opacidad:')) {
+      const op = parseInt(raw.slice('fondo:opacidad:'.length));
+      if (!isNaN(op)) {
+        slider.value = op;
+        opacLabel.textContent = op + '%';
+        opacidadActual = op;
+      }
+      return;
+    }
+    if (raw.startsWith('fondo:')) {
+      const ruta = raw.slice(6);
+      if (!ruta.startsWith('{')) mostrarFondoPreview(ruta);
+    }
+    if (raw.startsWith('extensiones:')) {
+      try {
+        const exts = JSON.parse(raw.slice('extensiones:'.length));
+        const extWidgets = document.getElementById('sb-ext-widgets');
+        if (!extWidgets) return;
+        extWidgets.innerHTML = '';
+
+        exts.forEach(ext => {
+          if (!ext.Widget) return;
+
+          const destino = ext.Widget.Destino ?? ext.Widget.destino ?? 'newtab';
+          const label = destino === 'sidebar' ? 'Widget de sidebar' : 'Widget de nueva pestaña';
+
+          const div = document.createElement('div');
+          div.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--surface2); border:1px solid var(--border); border-radius:8px;';
+          div.innerHTML = `
+            <div>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:13px; color:var(--text)">${ext.Icono ?? ext.icono ?? '🧩'} ${ext.Nombre ?? ext.nombre}</span>
+                <span style="font-size:9px; background:rgba(124,58,237,0.2); color:var(--accent);
+                  padding:2px 6px; border-radius:4px; letter-spacing:0.05em">EXTENSIÓN</span>
+              </div>
+              <div style="font-size:11px; color:var(--muted); margin-top:2px">${label} · ${ext.Descripcion ?? ext.descripcion ?? ''}</div>
+            </div>
+            <button class="sb-widget-toggle ${ext.Activa ?? ext.activa ? 'on' : ''}"
+              data-extid="${ext.Id ?? ext.id}"></button>
+          `;
+
+          const toggle = div.querySelector('.sb-widget-toggle');
+          toggle.addEventListener('click', () => {
+            toggle.classList.toggle('on');
+            const activa = toggle.classList.contains('on');
+            window.chrome.webview.postMessage(`extension:toggle:${ext.Id ?? ext.id}:${activa}`);
+          });
+
+          extWidgets.appendChild(div);
+        });
+      } catch { }
+      return;
+    }
+    if (raw.startsWith('atajos:')) {
+      try {
+        atajosData = JSON.parse(raw.slice('atajos:'.length));
+        renderAtajos();
+      } catch { }
+      return;
+    }
+  });
+
+  window.chrome.webview.postMessage('get:fondo:opacidad');
+  window.chrome.webview.postMessage('get:fondo');
+
+  // ── Sidebar editor ─────────────────────────────────
+  let sidebarItems = [];
+  let sbEditIndex = -1;
+
+  function renderSidebarEditor() {
+    const list = document.getElementById('sidebar-items-list');
+    list.innerHTML = '';
+    let dragSrc = null;
+
+    sidebarItems.forEach((item, i) => {
+      const el = document.createElement('div');
+      el.className = item.Separador || item.separador ? 'sb-sep-item' : 'sb-edit-item';
+      el.draggable = true;
+      el.dataset.index = i;
+
+      if (item.Separador || item.separador) {
+        el.innerHTML = `
+          <span style="flex:1;cursor:grab">⠿ ── Separador ──</span>
+          <div class="sb-edit-actions">
+            <button class="sb-edit-btn danger" onclick="eliminarSbItem(${i})">✕</button>
+          </div>`;
+      } else {
+        const visible = item.Visible ?? item.visible ?? true;
+        el.innerHTML = `
+          <span style="cursor:grab;margin-right:8px;color:var(--muted)">⠿</span>
+          <span class="sb-edit-emoji">${item.Emoji ?? item.emoji ?? '🌐'}</span>
+          <div style="flex:1;min-width:0;">
+            <div class="sb-edit-name">${item.Nombre ?? item.nombre ?? ''}</div>
+            <div class="sb-edit-url">${item.Url ?? item.url ?? ''}</div>
+          </div>
+          <div class="sb-edit-actions">
+            <button class="sb-edit-btn ${visible ? '' : 'danger'}" onclick="toggleSbVisible(${i})">
+              ${visible ? '👁' : '🚫'}
+            </button>
+            <button class="sb-edit-btn" onclick="editarSbItem(${i})">✏</button>
+            <button class="sb-edit-btn danger" onclick="eliminarSbItem(${i})">✕</button>
+          </div>`;
+      }
+
+      // ── Drag & drop ──
+      el.addEventListener('dragstart', e => {
+        dragSrc = i;
+        el.style.opacity = '0.4';
+        e.dataTransfer.effectAllowed = 'move';
+      });
+      el.addEventListener('dragend', () => {
+        el.style.opacity = '1';
+        list.querySelectorAll('.sb-edit-item, .sb-sep-item')
+          .forEach(r => r.style.borderTop = '');
+      });
+      el.addEventListener('dragover', e => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        list.querySelectorAll('.sb-edit-item, .sb-sep-item')
+          .forEach(r => r.style.borderTop = '');
+        el.style.borderTop = '2px solid var(--accent)';
+      });
+      el.addEventListener('drop', e => {
+        e.preventDefault();
+        if (dragSrc === null || dragSrc === i) return;
+        const moved = sidebarItems.splice(dragSrc, 1)[0];
+        sidebarItems.splice(i, 0, moved);
+        guardarSidebar();
+        renderSidebarEditor();
+      });
+
+      list.appendChild(el);
+    });
+  }
+
+  function moverSbItem(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= sidebarItems.length) return;
+    [sidebarItems[i], sidebarItems[j]] = [sidebarItems[j], sidebarItems[i]];
+    guardarSidebar(); renderSidebarEditor();
+  }
+
+  function eliminarSbItem(i) {
+    sidebarItems.splice(i, 1);
+    guardarSidebar(); renderSidebarEditor();
+  }
+
+  function toggleSbVisible(i) {
+    const item = sidebarItems[i];
+    item.Visible = !(item.Visible ?? item.visible ?? true);
+    guardarSidebar(); renderSidebarEditor();
+  }
+
+  function editarSbItem(i) {
+    sbEditIndex = i;
+    const item = sidebarItems[i];
+    document.getElementById('modal-sb-title').textContent = 'Editar enlace';
+    document.getElementById('sb-emoji').value  = item.Emoji  ?? item.emoji  ?? '';
+    document.getElementById('sb-nombre').value = item.Nombre ?? item.nombre ?? '';
+    document.getElementById('sb-url').value    = item.Url    ?? item.url    ?? '';
+    document.getElementById('modal-sidebar').style.display = 'flex';
+  }
+
+  function guardarSidebar() {
+    window.chrome.webview.postMessage('sidebar:guardar:' + JSON.stringify(sidebarItems));
+  }
+
+  document.getElementById('btn-add-sidebar').addEventListener('click', () => {
+    sbEditIndex = -1;
+    document.getElementById('modal-sb-title').textContent = 'Agregar enlace';
+    document.getElementById('sb-emoji').value  = '';
+    document.getElementById('sb-nombre').value = '';
+    document.getElementById('sb-url').value    = '';
+    document.getElementById('modal-sidebar').style.display = 'flex';
+  });
+
+  document.getElementById('modal-sb-cancel').addEventListener('click', () => {
+    document.getElementById('modal-sidebar').style.display = 'none';
+  });
+
+  document.getElementById('modal-sb-save').addEventListener('click', () => {
+    const emoji  = document.getElementById('sb-emoji').value.trim()  || '🌐';
+    const nombre = document.getElementById('sb-nombre').value.trim() || 'Enlace';
+    let   url    = document.getElementById('sb-url').value.trim();
+    if (url && !url.startsWith('http') && url !== 'nuevatab' && url !== 'historial' && url !== 'favoritos')
+      url = 'https://' + url;
+
+    const newItem = { Id: Date.now().toString(), Emoji: emoji, Nombre: nombre, Url: url, Visible: true, Separador: false };
+
+    if (sbEditIndex === -1)
+      sidebarItems.push(newItem);
+    else
+      sidebarItems[sbEditIndex] = { ...sidebarItems[sbEditIndex], ...newItem };
+
+    guardarSidebar();
+    renderSidebarEditor();
+    document.getElementById('modal-sidebar').style.display = 'none';
+  });
+
+  document.getElementById('btn-reset-sidebar').addEventListener('click', () => {
+    if (confirm('¿Restaurar el sidebar a la configuración por defecto?')) {
+      window.chrome.webview.postMessage('sidebar:reset');
+    }
+  });
+
+  // Recibir sidebar desde C#
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string') return;
+    if (raw.startsWith('sidebar:')) {
+      try {
+        sidebarItems = JSON.parse(raw.slice('sidebar:'.length));
+        renderSidebarEditor();
+      } catch { }
+    }
+  });
+
+  window.chrome.webview.postMessage('get:sidebar');
+
+  // ── Widgets sidebar ────────────────────────────────
+  document.querySelectorAll('.sb-widget-toggle').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('on');
+      const widget = btn.dataset.sbwidget;
+      const activo = btn.classList.contains('on');
+      window.chrome.webview.postMessage(`sidebar:widget:${widget}:${activo}`);
+    });
+  });
+
+  // Recibir config de widgets sidebar
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string') return;
+    if (raw.startsWith('sidebar:widgets:')) {
+      try {
+        const config = JSON.parse(raw.slice('sidebar:widgets:'.length));
+        document.querySelectorAll('.sb-widget-toggle').forEach(btn => {
+          const key = btn.dataset.sbwidget;
+          if (config[key] !== undefined)
+            btn.classList.toggle('on', config[key]);
+        });
+      } catch { }
+    }
+  });
+
+  window.chrome.webview.postMessage('get:sidebar:widgets');
+
+  // ── Rendimiento ────────────────────────────────────
+  let perfConfig = {
+    suspender_tabs:   true,
+    limpiar_cache:    false,
+    limite_tabs:      false,
+    limite_tabs_n:    10,
+    no_restaurar:     false,
+    suspender_media:  true
+  };
+
+  function aplicarPerfUI() {
+    document.querySelectorAll('[data-perf]').forEach(btn => {
+      const key = btn.dataset.perf;
+      if (perfConfig[key] !== undefined)
+        btn.classList.toggle('on', !!perfConfig[key]);
+    });
+    const limitVal = perfConfig.limite_tabs_n ?? 10;
+    const sliderEl = document.getElementById('slider-limite-tabs');
+    const valEl    = document.getElementById('limite-tabs-val');
+    const wrapEl   = document.getElementById('limite-tabs-wrap');
+    if (sliderEl) sliderEl.value = limitVal;
+    if (valEl)    valEl.textContent = limitVal;
+    if (wrapEl)   wrapEl.style.display = perfConfig.limite_tabs ? 'block' : 'none';
+  }
+
+  document.querySelectorAll('[data-perf]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.perf;
+      perfConfig[key] = !perfConfig[key];
+      aplicarPerfUI();
+      window.chrome.webview.postMessage('perf:config:' + JSON.stringify(perfConfig));
+      // Mensaje específico para media background
+      if (key === 'suspender_media')
+        window.chrome.webview.postMessage('perf:media_background:' + perfConfig[key]);
+    });
+  });
+
+  document.getElementById('slider-limite-tabs').addEventListener('input', function() {
+    perfConfig.limite_tabs_n = parseInt(this.value);
+    document.getElementById('limite-tabs-val').textContent = this.value;
+    window.chrome.webview.postMessage('perf:config:' + JSON.stringify(perfConfig));
+  });
+
+  // Recibir config de rendimiento
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string') return;
+    if (raw.startsWith('perf:config:')) {
+      try {
+        perfConfig = { ...perfConfig, ...JSON.parse(raw.slice('perf:config:'.length)) };
+        aplicarPerfUI();
+      } catch {}
+    }
+  });
+
+  window.chrome.webview.postMessage('get:perf:config');
+
+  // ── Navegación entre secciones ──────────────────────
+  function mostrarSeccion(id) {
+    ['apariencia','atajos','rendimiento','buscador','privacidad','widgets','sidebar','datos','actualizaciones'].forEach(s => {
+      const el = document.getElementById('seccion-' + s);
+      if (el) el.style.display = s === id ? 'block' : 'none';
+    });
+    document.querySelectorAll('.sb-item').forEach(a => {
+      a.classList.remove('active');
+      if (a.getAttribute('onclick')?.includes(id)) a.classList.add('active');
+    });
+    if (id === 'atajos')
+      window.chrome.webview.postMessage('get:atajos');
+  }
+
+  // Buscador
+  document.querySelectorAll('input[name="buscador"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      window.chrome.webview.postMessage('buscador:set:' + radio.value);
+    });
+  });
+
+  // Privacidad
+  document.querySelectorAll('[data-priv]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.classList.toggle('on');
+      const key = btn.dataset.priv;
+      const val = btn.classList.contains('on');
+      window.chrome.webview.postMessage(`priv:${key}:${val}`);
+    });
+  });
+
+  document.getElementById('btn-borrar-historial').addEventListener('click', () => {
+    if (confirm('¿Borrar todo el historial?'))
+      window.chrome.webview.postMessage('limpiar:historial');
+  });
+
+  // Recibir buscador activo
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string') return;
+    if (raw.startsWith('buscador:')) {
+      const val = raw.slice('buscador:'.length);
+      const radio = document.querySelector(`input[name="buscador"][value="${val}"]`);
+      if (radio) radio.checked = true;
+    }
+  });
+
+  // ── Atajos ───────────────────────────────────────────
+  let atajosData = [];
+  let atajoCapturando = null;
+
+  function renderAtajos() {
+    const lista = document.getElementById('atajos-lista');
+    if (!lista) return;
+    lista.innerHTML = '';
+
+    atajosData.forEach(a => {
+      const fila = document.createElement('div');
+      fila.style.cssText = `display:flex; align-items:center; gap:12px; padding:10px 14px;
+        background:var(--surface2); border:1px solid var(--border); border-radius:8px;`;
+
+      const desc = document.createElement('div');
+      desc.style.cssText = 'flex:1; font-size:13px; color:var(--text)';
+      desc.textContent = a.Descripcion ?? a.descripcion;
+
+      const teclaStr = formatAtajo(a);
+
+      const btnCapturar = document.createElement('button');
+      btnCapturar.className = 'btn-aplicar';
+      btnCapturar.style.cssText = 'padding:4px 12px; font-size:11px; margin:0; min-width:120px; text-align:center;';
+      btnCapturar.textContent = teclaStr || 'Sin asignar';
+      if (atajoCapturando === (a.Accion ?? a.accion)) {
+        btnCapturar.textContent = '⌨ Presiona una tecla...';
+        btnCapturar.style.background = 'rgba(255,255,255,0.1)';
+      }
+
+      btnCapturar.addEventListener('click', () => {
+        atajoCapturando = a.Accion ?? a.accion;
+        renderAtajos();
+      });
+
+      const btnReset = document.createElement('button');
+      btnReset.style.cssText = `background:transparent; border:1px solid var(--border);
+        color:var(--muted); padding:4px 10px; border-radius:4px; cursor:pointer;
+        font-size:11px; font-family:'Segoe UI',sans-serif; transition:all 0.15s;`;
+      btnReset.textContent = '↺';
+      btnReset.title = 'Restablecer';
+      btnReset.addEventListener('click', () => {
+        window.chrome.webview.postMessage('atajo:restablecer:' + (a.Accion ?? a.accion));
+        atajoCapturando = null;
+      });
+
+      fila.appendChild(desc);
+      fila.appendChild(btnCapturar);
+      fila.appendChild(btnReset);
+      lista.appendChild(fila);
+    });
+  }
+
+  function formatAtajo(a) {
+    const partes = [];
+    if (a.Ctrl  ?? a.ctrl)  partes.push('Ctrl');
+    if (a.Shift ?? a.shift) partes.push('Shift');
+    if (a.Alt   ?? a.alt)   partes.push('Alt');
+    const tecla = a.Tecla ?? a.tecla ?? '';
+    if (tecla) partes.push(tecla.replace('Oem', '').replace('Media', ''));
+    return partes.join(' + ');
+  }
+
+  function restablecerTodos() {
+    if (confirm('¿Restablecer todos los atajos a sus valores por defecto?'))
+      window.chrome.webview.postMessage('atajos:restablecer:todos');
+    atajoCapturando = null;
+  }
+
+  // Capturar tecla cuando hay un atajo pendiente
+  document.addEventListener('keydown', e => {
+    if (!atajoCapturando) return;
+    if (['Control','Shift','Alt'].includes(e.key)) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const ctrl  = e.ctrlKey;
+    const shift = e.shiftKey;
+    const alt   = e.altKey;
+    const tecla = e.code.replace('Key', '').replace('Digit', 'D');
+
+    window.chrome.webview.postMessage('atajo:establecer:' + JSON.stringify({
+      Accion: atajoCapturando,
+      Ctrl:   ctrl,
+      Shift:  shift,
+      Alt:    alt,
+      Tecla:  tecla,
+      Descripcion: atajosData.find(a => (a.Accion ?? a.accion) === atajoCapturando)?.Descripcion ?? ''
+    }));
+
+    atajoCapturando = null;
+  }, true);
+
+  // Listener para recibir atajos desde C#
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw === 'string' && raw.startsWith('atajos:')) {
+      atajosData = JSON.parse(raw.slice('atajos:'.length));
+      renderAtajos();
+    }
+  });
+
+  window.chrome.webview.postMessage('get:atajos');
+  window.chrome.webview.postMessage('get:buscador');
+  window.chrome.webview.postMessage('get:extensiones');
+
+  // ── Datos y respaldo ────────────────────────────────
+  document.getElementById('btn-exportar-config').addEventListener('click', () => {
+    window.chrome.webview.postMessage('exportar:config');
+  });
+  document.getElementById('btn-importar-config').addEventListener('click', () => {
+    window.chrome.webview.postMessage('importar:config');
+  });
+  document.getElementById('btn-exportar-datos').addEventListener('click', () => {
+    window.chrome.webview.postMessage('exportar:datos');
+  });
+  document.getElementById('btn-importar-datos').addEventListener('click', () => {
+    window.chrome.webview.postMessage('importar:datos');
+  });
+
+  window.chrome.webview.addEventListener('message', e => {
+    if (typeof e.data !== 'string') return;
+    if (e.data.startsWith('respaldo:')) {
+      const msg = e.data.slice('respaldo:'.length);
+      const status = document.getElementById('datos-status');
+      status.style.display = 'block';
+      status.textContent = msg;
+      setTimeout(() => status.style.display = 'none', 4000);
+    }
+  });
+
+  document.getElementById('sb-perfiles')?.addEventListener('click', e => {
+    e.preventDefault();
+    window.chrome.webview.postMessage('perfiles');
+  });
+
+  // ── Actualizaciones ──────────────────────────────────
+  let _updateUrl = '';
+
+  function buscarActualizaciones() {
+      const estado = document.getElementById('update-estado');
+      const titulo = document.getElementById('update-titulo');
+      const notas  = document.getElementById('update-notas');
+      const btn    = document.getElementById('update-btn');
+
+      estado.style.display = 'block';
+      titulo.textContent   = 'Buscando actualizaciones...';
+      notas.textContent    = '';
+      btn.style.display    = 'none';
+
+      window.chrome.webview.postMessage('update:check');
+  }
+
+  // Recibir respuesta del C#
+  window.chrome.webview.addEventListener('message', e => {
+      const raw = e.data;
+      if (raw.startsWith('update:')) {
+          const data  = JSON.parse(raw.slice('update:'.length));
+          const estado = document.getElementById('update-estado');
+          const titulo = document.getElementById('update-titulo');
+          const notas  = document.getElementById('update-notas');
+          const btn    = document.getElementById('update-btn');
+
+          estado.style.display = 'block';
+
+          if (data.hayUpdate) {
+              estado.style.borderColor = 'rgba(124,58,237,0.5)';
+              titulo.innerHTML = `✦ Nueva versión disponible — <strong>v${data.version}</strong>`;
+              notas.textContent = data.notas;
+              btn.style.display = 'inline-block';
+              _updateUrl = data.url;
+              btn.onclick = () => window.chrome.webview.postMessage('update:instalar:' + _updateUrl);
+          } else if (data.error) {
+              estado.style.borderColor = 'rgba(255,85,85,0.4)';
+              titulo.textContent = '✖ Error al buscar actualizaciones';
+              notas.textContent  = data.error;
+          } else {
+              estado.style.borderColor = 'rgba(80,250,123,0.3)';
+              titulo.textContent = '✓ Estás al día';
+              notas.textContent  = `Versión ${data.version} es la más reciente.`;
+          }
+      }
+  });
+</script>
+</body>
+</html>
