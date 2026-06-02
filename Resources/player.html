@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+</head>
+<body>
+<audio id="audio" preload="auto"></audio>
+<script>
+(function() {
+    const audio = document.getElementById('audio');
+    let playlists = [{ nombre: 'Principal', imagen: null, canciones: [] }];
+    let playlistActiva = 0;
+    let indice = 0;
+    let shuffle = false;
+    let repeat = 'none';
+    let volumen = 0.8;
+    let shuffleOrder = [];
+
+    audio.volume = volumen;
+
+    function playlist() { return playlists[playlistActiva]; }
+    function canciones() { return playlist().canciones; }
+
+    // Desbloquear AudioContext al primer mensaje del host
+    function desbloquearAudio() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if (ctx.state === 'suspended') ctx.resume();
+        } catch(e) {}
+    }
+    window.chrome.webview.addEventListener('message', desbloquearAudio, { once: true });
+
+    function generarShuffleOrder() {
+        shuffleOrder = [...Array(canciones().length).keys()];
+        for (let i = shuffleOrder.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [shuffleOrder[i], shuffleOrder[j]] = [shuffleOrder[j], shuffleOrder[i]];
+        }
+    }
+
+    function cancionActual() { return canciones()[indice] ?? null; }
+
+    function enviarEstado() {
+        const cancion = cancionActual();
+        window.chrome.webview.postMessage('musica:estado:' + JSON.stringify({
+            reproduciendo: !audio.paused,
+            titulo:  cancion?.titulo  ?? '',
+            autor:   cancion?.autor   ?? '',
+            imagen:  cancion?.imagen  ?? '',
+            indice,
+            total: canciones().length,
+            volumen,
+            shuffle,
+            repeat,
+            progreso: audio.currentTime,
+            duracion: audio.duration || 0,
+            playlistActiva,
+            playlistNombre: playlist().nombre,
+            playlistImagen: playlist().imagen ?? ''
+        }));
+    }
+
+    function enviarPlaylists() {
+        window.chrome.webview.postMessage('musica:playlists:' + JSON.stringify(
+            playlists.map(p => ({ nombre: p.nombre, imagen: p.imagen ?? '', total: p.canciones.length }))
+        ));
+    }
+
+    function cargarYReproducir(idx) {
+        if (canciones().length === 0) return;
+        indice = idx;
+        const cancion = cancionActual();
+        if (!cancion) return;
+        audio.oncanplay = null;
+        audio.pause();
+        audio.src = cancion.url;
+        window.chrome.webview.postMessage('musica:notify:' + cancion.titulo + '|' + (cancion.imagen || playlist().imagen || ''));
+        audio.load();
+        audio.oncanplay = () => {
+            audio.oncanplay = null;
+            audio.play().catch(err =>
+                window.chrome.webview.postMessage('musica:notify:ERROR: ' + err.message + '|'));
+        };
+        enviarEstado();
+    }
+
+    function aleatorio() {
+        if (canciones().length === 0) return;
+        const idx = Math.floor(Math.random() * canciones().length);
+        cargarYReproducir(idx);
+    }
+
+    function siguiente() {
+        if (canciones().length === 0) return;
+        if (repeat === 'one') { audio.currentTime = 0; audio.play().catch(() => {}); return; }
+        if (shuffle) {
+            const idx = shuffleOrder.indexOf(indice);
+            cargarYReproducir(shuffleOrder[(idx + 1) % shuffleOrder.length]);
+        } else {
+            const next = (indice + 1) % canciones().length;
+            if (next === 0 && repeat === 'none') { audio.pause(); enviarEstado(); return; }
+            cargarYReproducir(next);
+        }
+    }
+
+    function anterior() {
+        if (canciones().length === 0) return;
+        if (audio.currentTime > 3) { audio.currentTime = 0; return; }
+        if (shuffle) {
+            const idx = shuffleOrder.indexOf(indice);
+            cargarYReproducir(shuffleOrder[(idx - 1 + shuffleOrder.length) % shuffleOrder.length]);
+        } else {
+            cargarYReproducir((indice - 1 + canciones().length) % canciones().length);
+        }
+    }
+
+    audio.addEventListener('ended', siguiente);
+    audio.addEventListener('timeupdate', () => {
+        if (Math.floor(audio.currentTime) % 2 === 0) enviarEstado();
+    });
+    audio.addEventListener('play', enviarEstado);
+    audio.addEventListener('pause', enviarEstado);
+    audio.addEventListener('error', e => {
+        const err = audio.error;
+        let detalle = 'desconocido';
+        if (err) {
+            const codigos = { 1:'ABORTED',2:'NETWORK',3:'DECODE',4:'SRC_NOT_SUPPORTED' };
+            detalle = `[${err.code}] ${codigos[err.code] ?? ''} - ${err.message}`;
+        }
+        window.chrome.webview.postMessage('musica:notify:❌ ' + detalle + '|');
+    });
+
+    window.chrome.webview.addEventListener('message', e => {
+        const msg = e.data;
+        if (typeof msg !== 'string') return;
+
+        if (msg === 'player:play') {
+            audio.play().catch(err =>
+                window.chrome.webview.postMessage('musica:notify:ERROR play: ' + err.message + '|'));
+        } else if (msg === 'player:pause') {
+            audio.pause();
+        } else if (msg === 'player:siguiente') {
+            siguiente();
+        } else if (msg === 'player:anterior') {
+            anterior();
+        } else if (msg === 'player:aleatorio') {
+            aleatorio();
+        } else if (msg.startsWith('player:volumen:')) {
+            volumen = parseFloat(msg.slice('player:volumen:'.length));
+            audio.volume = volumen;
+            enviarEstado();
+        } else if (msg.startsWith('player:shuffle:')) {
+            shuffle = msg.endsWith('true');
+            if (shuffle) generarShuffleOrder();
+            enviarEstado();
+        } else if (msg.startsWith('player:repeat:')) {
+            repeat = msg.slice('player:repeat:'.length);
+            enviarEstado();
+        } else if (msg.startsWith('player:playlists:')) {
+            // Recibe el array completo de playlists
+            playlists = JSON.parse(msg.slice('player:playlists:'.length));
+            indice = 0;
+            if (shuffle) generarShuffleOrder();
+            enviarEstado();
+            enviarPlaylists();
+        } else if (msg.startsWith('player:switchplaylist:')) {
+            const idx = parseInt(msg.slice('player:switchplaylist:'.length));
+            if (idx >= 0 && idx < playlists.length) {
+                playlistActiva = idx;
+                indice = 0;
+                // NO pausar — solo cambiar el contexto visual, la música sigue
+                if (shuffle) generarShuffleOrder();
+                enviarEstado();
+                enviarPlaylists();
+            }
+        } else if (msg.startsWith('player:reproducir:')) {
+            cargarYReproducir(parseInt(msg.slice('player:reproducir:'.length)));
+            setTimeout(enviarEstado, 300);
+        } else if (msg === 'player:estado') {
+            enviarEstado();
+            enviarPlaylists();
+        } else if (msg.startsWith('player:seek:')) {
+            audio.currentTime = parseFloat(msg.slice('player:seek:'.length));
+        }
+    });
+
+    enviarEstado();
+    enviarPlaylists();
+})();
+</script>
+</body>
+</html>

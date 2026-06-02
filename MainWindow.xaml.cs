@@ -19,8 +19,27 @@ namespace atsukibrowser
 {
     public partial class MainWindow : Window
     {
+        private Color _accentColor = (Color)ColorConverter.ConvertFromString("#7c3aed");
         private static readonly System.Net.Http.HttpClient _httpClient = new();
-        private const string AppVersion = "1.0.1";
+        private static string? _appVersionCache;
+        private bool _recibirPreviews = false;
+        private WebView2? _musicaWebView;
+        private bool _musicaInicializada = false;
+        private bool _musicaPanelAbierto = false;
+        private List<(string titulo, string url)> _musicaPlaylist = new();
+        private int _musicaIndiceActivo = -1;
+        private bool _musicaReproduciendo = false;
+        private bool _aplicandoZoom = false;
+        private static string AppVersion
+        {
+            get
+            {
+                if (_appVersionCache != null) return _appVersionCache;
+                string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "version.txt");
+                _appVersionCache = File.Exists(path) ? File.ReadAllText(path).Trim() : "1.0.0";
+                return _appVersionCache;
+            }
+        }
         private TextBlock? _sbCpuVal, _sbRamVal, _sbDiscoVal, _sbRedVal;
         private System.Windows.Shapes.Rectangle? _sbCpuBar, _sbRamBar, _sbDiscoBar;
         private bool _sbWidgetRendimiento = true;
@@ -50,13 +69,18 @@ namespace atsukibrowser
         private readonly string _urlPerfiles;
         private string _buscadorActivo = "google";
         private bool _perfSuspenderTabs  = true;
+        private Dictionary<int, System.Windows.Media.Imaging.BitmapImage> _tabPreviews = new();
         private bool _perfLimpiarCache   = false;
         private bool _perfLimiteTabs     = false;
         private int  _perfLimiteTabsN    = 10;
         private bool _suspenderMediaEnBackground = true;
+        private List<MusicaPlaylist> _playlists = new();
+        private int _playlistActiva = 0;
         private string _musicaUltimoTitulo = "";
         private string _musicaImagenCache  = "";
         private string _musicaFuenteCache = "";
+        private bool _musicaArranqueInicial = true;
+        private Window? _musicaToast;
         private System.Timers.Timer? _cacheTimer;
         private string _carpetaPerfil = "";
         private Perfil _perfilActivo = null!;
@@ -69,7 +93,10 @@ namespace atsukibrowser
         private List<DialEntry> _dials = new();
         private System.Windows.Threading.DispatcherTimer? _previewTimer;
         private int _previewTabIdx = -1;
-
+        private Dictionary<string, double> _zoomPorDominio = new();
+        private bool _ignorarTextChanged = false;
+        private bool _ignorarGotFocus = false;
+        private bool _urlBarClickado = false;
         private static readonly System.Text.Json.JsonSerializerOptions _jsonOpts = new();
 
         [DllImport("user32.dll")]
@@ -122,6 +149,7 @@ namespace atsukibrowser
                 var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
                 int color = DWMWA_COLOR_NONE;
                 DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, ref color, sizeof(int));
+                InicializarControlsMusica();
             };
             StateChanged += (s, e) =>
             {
@@ -151,27 +179,58 @@ namespace atsukibrowser
 
             InicializarManagers();
             InicializarEntorno();
-            SugerenciasList.MouseLeftButtonUp += (s, e) =>
+            SugerenciasPopup.PreviewMouseLeftButtonDown += (s, e) =>
             {
-                if (SugerenciasList.SelectedItem is string seleccion)
+                // Dar tiempo a que WPF seleccione el item antes de leerlo
+                Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    SugerenciasPopup.IsOpen = false;
-                    UrlBar.Text = seleccion;
-                    Navegar(seleccion);
-                }
+                    if (SugerenciasList.SelectedItem is SugerenciaItem sug)
+                    {
+                        SugerenciasPopup.IsOpen = false;
+                        UrlBar.Text = sug.Url;
+                        Navegar(sug.Url);
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            Keyboard.ClearFocus();
+                            if (_activeTab >= 0 && _activeTab < _tabs.Count)
+                            {
+                                FocusManager.SetFocusedElement(this, _tabs[_activeTab]);
+                                _tabs[_activeTab].Focus();
+                            }
+                            ActualizarUrlDisplay(sug.Url);
+                        }), System.Windows.Threading.DispatcherPriority.Input);
+                    }
+                }), System.Windows.Threading.DispatcherPriority.Send); // Send = máxima prioridad
             };
 
             SugerenciasList.KeyDown += (s, e) =>
             {
-                if (e.Key == Key.Enter && SugerenciasList.SelectedItem is string sel)
+                if (e.Key == Key.Enter && SugerenciasList.SelectedItem is SugerenciaItem sug)
                 {
                     SugerenciasPopup.IsOpen = false;
-                    UrlBar.Text = sel;
-                    Navegar(sel);
+                    UrlBar.Text = sug.Url;
+                    Navegar(sug.Url);
                 }
             };
+            UrlBar.PreviewMouseDown += (s, e) => _urlBarClickado = true;
+            this.PreviewGotKeyboardFocus += (s, e) =>
+            {
+                if (e.NewFocus != UrlBar && 
+                    e.NewFocus != SugerenciasList &&
+                    !(e.NewFocus is ListBoxItem))
+                {
+                    SugerenciasPopup.IsOpen = false;
+                }
+            };
+            // Mostrar badge si es versión preview
+            if (AppVersion.Contains("-prev") || AppVersion.Contains("-beta") || AppVersion.Contains("-alpha"))
+            {
+                BadgePreview.Visibility = Visibility.Visible;
+                MarcaAgua.Visibility = Visibility.Visible;
+            }
             _ = Task.Run(VerificarActualizaciones);
             VerificarPrimeraEjecucion();
+            TabScrollViewer.SizeChanged += (s, e) => ActualizarEstiloTabs();
         }
 
         private async void VerificarActualizaciones()
@@ -183,14 +242,29 @@ namespace atsukibrowser
                 string json = await client.GetStringAsync(
                     $"https://gist.githubusercontent.com/Gatosuki689/f24638ebb9ed77db3a58fc2318103b39/raw/version.json?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
 
-                var doc = JsonSerializer.Deserialize<JsonElement>(json);
+                var doc    = JsonSerializer.Deserialize<JsonElement>(json);
                 string ultima = doc.TryGetProperty("version", out var v) ? v.GetString() ?? "" : "";
                 string url    = doc.TryGetProperty("url",     out var u) ? u.GetString() ?? "" : "";
                 string notas  = doc.TryGetProperty("notas",   out var n) ? n.GetString() ?? "" : "";
 
+                // Revisar canal preview si está activado
+                if (_recibirPreviews && doc.TryGetProperty("preview", out var prev))
+                {
+                    string prevVersion = prev.TryGetProperty("version", out var pv) ? pv.GetString() ?? "" : "";
+                    string prevUrl     = prev.TryGetProperty("url",     out var pu) ? pu.GetString() ?? "" : "";
+                    string prevNotas   = prev.TryGetProperty("notas",   out var pn) ? pn.GetString() ?? "" : "";
+
+                    // Usar preview si es más nueva que la versión actual
+                    if (!string.IsNullOrEmpty(prevVersion) && prevVersion != AppVersion)
+                    {
+                        ultima = prevVersion;
+                        url    = prevUrl;
+                        notas  = $"[Preview] {prevNotas}";
+                    }
+                }
+
                 if (string.IsNullOrEmpty(ultima) || ultima == AppVersion) return;
 
-                // Hay actualización disponible
                 Dispatcher.Invoke(() => MostrarNotificacionUpdate(ultima, url, notas));
             }
             catch { }
@@ -453,124 +527,117 @@ namespace atsukibrowser
             });
         }
 
-        private void AbrirNotasVersion(string version, string notas)
+        private async void AbrirNotasVersion(string version, string notas)
         {
-            // Generar HTML de las notas
             string html = $$"""
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-        <meta charset="UTF-8">
-        <style>
-            * { margin:0; padding:0; box-sizing:border-box; }
-            body {
-                font-family: 'Segoe UI', sans-serif;
-                background: #0d0d14;
-                color: rgba(255,255,255,0.85);
-                display: flex;
-                justify-content: center;
-                padding: 60px 20px;
-                min-height: 100vh;
-            }
-            .card {
-                width: 100%;
-                max-width: 620px;
-            }
-            .badge {
-                display: inline-block;
-                background: rgba(124,58,237,0.15);
-                border: 1px solid rgba(124,58,237,0.3);
-                color: #9d5aff;
-                font-size: 11px;
-                font-weight: 600;
-                letter-spacing: 0.08em;
-                text-transform: uppercase;
-                padding: 4px 12px;
-                border-radius: 20px;
-                margin-bottom: 16px;
-            }
-            h1 {
-                font-size: 32px;
-                font-weight: 700;
-                letter-spacing: -1px;
-                margin-bottom: 6px;
-            }
-            .sub {
-                font-size: 13px;
-                color: rgba(255,255,255,0.35);
-                margin-bottom: 32px;
-            }
-            .divider {
-                height: 1px;
-                background: rgba(124,58,237,0.2);
-                margin-bottom: 32px;
-            }
-            .notas-titulo {
-                font-size: 11px;
-                text-transform: uppercase;
-                letter-spacing: 0.1em;
-                color: #7c3aed;
-                margin-bottom: 16px;
-            }
-            .notas {
-                background: #13131f;
-                border: 1px solid rgba(124,58,237,0.2);
-                border-radius: 12px;
-                padding: 20px 24px;
-                font-size: 13px;
-                line-height: 1.8;
-                color: rgba(255,255,255,0.7);
-                white-space: pre-line;
-            }
-            .footer {
-                margin-top: 32px;
-                font-size: 12px;
-                color: rgba(255,255,255,0.25);
-                text-align: center;
-            }
-        </style>
-        </head>
-        <body>
-            <div class="card">
-                <div class="badge">Novedades</div>
-                <h1>AtsukiBrowser {{version}}</h1>
-                <div class="sub">Gracias por actualizar. Esto es lo nuevo en esta versión.</div>
-                <div class="divider"></div>
-                <div class="notas-titulo">Notas de versión</div>
-                <div class="notas">{{notas}}</div>
-                <div class="footer">AtsukiBrowser · v{{version}}</div>
-            </div>
-        </body>
-        </html>
-        """;
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+            <meta charset="UTF-8">
+            <style>
+                * { margin:0; padding:0; box-sizing:border-box; }
+                body {
+                    font-family: 'Segoe UI', sans-serif;
+                    background: #0d0d14;
+                    color: rgba(255,255,255,0.85);
+                    display: flex;
+                    justify-content: center;
+                    padding: 60px 20px;
+                    min-height: 100vh;
+                }
+                .card { width: 100%; max-width: 620px; }
+                .badge {
+                    display: inline-block;
+                    background: rgba(124,58,237,0.15);
+                    border: 1px solid rgba(124,58,237,0.3);
+                    color: #9d5aff;
+                    font-size: 11px;
+                    font-weight: 600;
+                    letter-spacing: 0.08em;
+                    text-transform: uppercase;
+                    padding: 4px 12px;
+                    border-radius: 20px;
+                    margin-bottom: 16px;
+                }
+                h1 { font-size: 32px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px; }
+                .sub { font-size: 13px; color: rgba(255,255,255,0.35); margin-bottom: 32px; }
+                .divider { height: 1px; background: rgba(124,58,237,0.2); margin-bottom: 32px; }
+                .notas-titulo { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #7c3aed; margin-bottom: 16px; }
+                .notas { background: #13131f; border: 1px solid rgba(124,58,237,0.2); border-radius: 12px; padding: 20px 24px; font-size: 13px; line-height: 1.8; color: rgba(255,255,255,0.7); white-space: pre-line; }
+                .footer { margin-top: 32px; font-size: 12px; color: rgba(255,255,255,0.25); text-align: center; }
+            </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="badge">Novedades</div>
+                    <h1>AtsukiBrowser {{version}}</h1>
+                    <div class="sub">Gracias por actualizar. Esto es lo nuevo en esta versión.</div>
+                    <div class="divider"></div>
+                    <div class="notas-titulo">Notas de versión</div>
+                    <div class="notas">{{(string.IsNullOrWhiteSpace(notas) ? "Sin notas para esta versión." : notas)}}</div>
+                    <div class="footer">AtsukiBrowser · v{{version}}</div>
+                </div>
+            </body>
+            </html>
+            """;
 
-            // Abrir en nueva tab
+            // Esperar a que haya al menos una tab lista
+            if (_tabs.Count == 0 || _activeTab < 0)
+            {
+                await Task.Delay(500);
+                if (_tabs.Count == 0 || _activeTab < 0) return;
+            }
+
             AbrirNuevaTab();
+
+            // Verificar que se creó correctamente
+            if (_activeTab < 0 || _activeTab >= _tabs.Count) return;
+
             var webView = _tabs[_activeTab];
-            webView.NavigateToString(html);
-            // Actualizar título de la tab
             int idx = _activeTab;
+
+            // Esperar a que CoreWebView2 esté listo
+            await webView.EnsureCoreWebView2Async(_env);
+
+            // Esperar un tick para que NuevaTab.html termine de iniciar su navegación
+            await Task.Delay(300);
+
+            webView.NavigateToString(html);
+
             if (idx >= 0 && idx < _tabButtons.Count && _tabButtons[idx].Tag is TextBlock label)
                 label.Text = $"Novedades v{version}";
+
+            // Mostrar URL amigable en la barra
+            if (idx == _activeTab)
+            {
+                _ignorarGotFocus = true;
+                UrlBar.Text = $"atsuki://novedades/v{version}";
+                ActualizarUrlDisplay($"atsuki://novedades/v{version}");
+                _ignorarGotFocus = false;
+            }
         }
 
         private string[] GetFlagsSegunHardware()
         {
             var flagsBase = new List<string>
             {
-                "--process-per-site",
+                "--process-per-tab",
                 "--enable-gpu-rasterization",
                 "--enable-zero-copy",
                 "--ignore-gpu-blocklist",
                 "--enable-accelerated-video-decode",
                 "--enable-accelerated-video-encode",
                 "--js-flags=--max-old-space-size=256",
-                "--renderer-process-limit=3",
+                "--renderer-process-limit=6",
                 "--disable-dev-shm-usage",
                 "--force-color-profile=srgb",
                 "--disable-background-timer-throttling",
                 "--force-device-scale-factor=1",
                 "--disable-renderer-backgrounding",
+                "--allow-file-access-from-files",
+                "--autoplay-policy=no-user-gesture-required",
+                "--disable-background-media-suspend",
+                "--audio-output-channels=2",
             };
 
             try
@@ -730,6 +797,12 @@ namespace atsukibrowser
                         File.ReadAllText(sbWidgetsPath));
                     if (json.TryGetProperty("rendimiento", out var val))
                         _sbWidgetRendimiento = val.GetBoolean();
+                    if (json.TryGetProperty("reloj", out var reloj))
+                        _sbWidgetReloj = reloj.GetBoolean();
+                    if (json.TryGetProperty("capturas", out var capturas))
+                        _sbWidgetCapturas = capturas.GetBoolean();
+                    if (json.TryGetProperty("busqueda", out var busqueda))
+                        _sbWidgetBusqueda = busqueda.GetBoolean();
                 }
                 catch { }
             }
@@ -750,6 +823,12 @@ namespace atsukibrowser
             if (File.Exists(perfPath))
                 AplicarPerfConfig(File.ReadAllText(perfPath));
             AplicarTemaUI(_temas.TemaActivo);
+            // Cargar preferencia de previews
+            string previewsPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "AtsukiBrowser", "previews.txt");
+            if (File.Exists(previewsPath))
+                _recibirPreviews = File.ReadAllText(previewsPath).Trim() == "true";
             // Registrar mutex de esta instancia
             string perfilId = _perfiles.Activo.Id;
             string mutexName = $"AtsukiBrowser_perfil_{perfilId}";
@@ -769,7 +848,9 @@ namespace atsukibrowser
             RenderizarSidebar();
             SincronizarExtensionesSidebar();
             IniciarBadgesSidebar();
+            _ = InicializarMusicaWebView();
         }
+        
 
         private void InicializarManagers()
         {
@@ -851,6 +932,23 @@ namespace atsukibrowser
                 webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
                 webView.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
                 webView.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
+
+                // Interceptar atajos antes de que WebView los consuma
+                webView.CoreWebView2.GetDevToolsProtocolEventReceiver("Input.keyEventFired");
+                webView.KeyDown += (s, e) =>
+                {
+                    bool ctrl  = Keyboard.IsKeyDown(Key.LeftCtrl)  || Keyboard.IsKeyDown(Key.RightCtrl);
+                    bool shift = Keyboard.IsKeyDown(Key.LeftShift) || Keyboard.IsKeyDown(Key.RightShift);
+                    bool alt   = Keyboard.IsKeyDown(Key.LeftAlt)   || Keyboard.IsKeyDown(Key.RightAlt);
+                    string tecla = e.Key.ToString();
+
+                    if (_atajos.Coincide("busqueda_rapida", ctrl, shift, alt, tecla))
+                    {
+                        PopupBuscadorSidebar.IsOpen = true;
+                        SidebarBuscadorInput.Focus();
+                        e.Handled = true;
+                    }
+                };
                 webView.CoreWebView2.DocumentTitleChanged += (s, e) =>
                 {
                     Dispatcher.Invoke(() =>
@@ -968,6 +1066,15 @@ namespace atsukibrowser
                 menuList.Add(CrearSep());
                 menuList.Add(CrearItem("Inspeccionar", () =>
                     webView.CoreWebView2.OpenDevToolsWindow()));
+            };
+
+            // Cerrar popup de sugerencias cuando el WebView recibe el foco
+            webView.GotFocus += (s, e) =>
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    SugerenciasPopup.IsOpen = false;
+                }), System.Windows.Threading.DispatcherPriority.Normal);
             };
 
             // ── Todos los mensajes JS → C# en un solo lugar ──
@@ -1944,6 +2051,66 @@ namespace atsukibrowser
                     string val = msg.Substring("set:segundos:".Length);
                     File.WriteAllText(Path.Combine(_carpetaPerfil, "segundos.txt"), val);
                 }
+                else if (msg == "get:ntcfg")
+                {
+                    string path = Path.Combine(_carpetaPerfil, "ntcfg.json");
+                    string json = File.Exists(path) ? File.ReadAllText(path) : "{}";
+                    webView.CoreWebView2.PostWebMessageAsString("ntcfg:" + json);
+                }
+                else if (msg.StartsWith("ntcfg:guardar:"))
+                {
+                    string path = Path.Combine(_carpetaPerfil, "ntcfg.json");
+                    File.WriteAllText(path, msg.Substring("ntcfg:guardar:".Length));
+                }
+                else if (msg.StartsWith("atsukimusic:player:"))
+                {
+                    string cmd = msg.Substring("atsukimusic:player:".Length);
+                    Dispatcher.Invoke(async () =>
+                    {
+                        await InicializarMusicaWebView();
+                        _musicaWebView?.CoreWebView2?.PostWebMessageAsString(cmd);
+                    });
+                }
+                else if (msg == "atsukimusic:elegir:archivo")
+                {
+                    Dispatcher.Invoke(async () =>
+                    {
+                        var dialog = new Microsoft.Win32.OpenFileDialog
+                        {
+                            Title = "Agregar música",
+                            Filter = "Audio|*.mp3;*.flac;*.wav;*.ogg;*.aac;*.m4a",
+                            Multiselect = true
+                        };
+                        if (dialog.ShowDialog() != true) return;
+
+                        await InicializarMusicaWebView();
+
+                        foreach (var archivo in dialog.FileNames)
+                        {
+                            string nombre = Path.GetFileNameWithoutExtension(archivo);
+                            string url    = "file:///" + archivo.Replace("\\", "/");
+                            string json   = System.Text.Json.JsonSerializer.Serialize(
+                                new { titulo = nombre, url });
+                            webView.CoreWebView2?.PostWebMessageAsString("atsukimusic:archivo:" + json);
+                        }
+                    });
+                }
+                else if (msg == "previews:activar")
+                {
+                    _recibirPreviews = true;
+                    string path = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "AtsukiBrowser", "previews.txt");
+                    File.WriteAllText(path, "true");
+                }
+                else if (msg == "previews:desactivar")
+                {
+                    _recibirPreviews = false;
+                    string path = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "AtsukiBrowser", "previews.txt");
+                    File.WriteAllText(path, "false");
+                }
             };
 
             // ── Descargas ────────────────────────────────────
@@ -1990,6 +2157,29 @@ namespace atsukibrowser
                 string newUrl = args.Uri;
                 Dispatcher.Invoke(() => AbrirNuevaTab(newUrl));
             };
+            // Detectar cuando WebView2 resetea el zoom y restaurarlo
+            webView.ZoomFactorChanged += (s, e) =>
+            {
+                if (_aplicandoZoom) return;
+                int idx = _tabs.IndexOf(webView);
+                if (idx != _activeTab) return;
+
+                string url2 = "";
+                Dispatcher.Invoke(() => url2 = webView.Source?.ToString() ?? "");
+                string dom = GetDominioZoom(url2);
+
+                if (!string.IsNullOrEmpty(dom) && _zoomPorDominio.TryGetValue(dom, out double zoomGuardado))
+                {
+                    if (Math.Abs(webView.ZoomFactor - zoomGuardado) > 0.01)
+                    {
+                        _aplicandoZoom = true;
+                        webView.ZoomFactor = zoomGuardado;
+                        _aplicandoZoom = false;
+                    }
+                }
+
+                Dispatcher.Invoke(ActualizarZoomLabel);
+            };
 
             webView.Source = new Uri(url);
             webView.NavigationCompleted += async (s, e) =>
@@ -2007,7 +2197,12 @@ namespace atsukibrowser
 
                     // Actualizar URL bar si es la tab activa
                     if (idx == _activeTab)
+                    {
+                        _ignorarGotFocus = true;
                         UrlBar.Text = url;
+                        SugerenciasPopup.IsOpen = false;
+                        _ignorarGotFocus = false;
+                    }
 
                     // Actualizar título del botón de tab
                     if (_tabButtons[idx].Tag is TextBlock label)
@@ -2021,8 +2216,12 @@ namespace atsukibrowser
                 });
 
                 webView.CoreWebView2?.PostWebMessageAsString("tema:" + _temas.ToJson());
+                webView.CoreWebView2?.PostWebMessageAsString("version:" + AppVersion);
                 webView.CoreWebView2?.PostWebMessageAsString("perfil:activo:" + 
                     System.Text.Json.JsonSerializer.Serialize(_perfiles.Activo));
+                
+                if (_musicaInicializada && _musicaWebView?.CoreWebView2 != null)
+                    _musicaWebView.CoreWebView2.PostWebMessageAsString("player:estado");
 
                 // Inyectar scripts de extensiones (no en modo invitado)
                 if (!_perfiles.Activo.EsInvitado)
@@ -2152,24 +2351,24 @@ namespace atsukibrowser
 
         private Button CrearBotonTab(string titulo, int index)
         {
-            var panel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center
-            };
+            var panel = new Grid();
+            panel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            panel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            panel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            panel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            // Favicon
             var favicon = new Image
             {
                 Width = 14, Height = 14,
                 Margin = new Thickness(0, 0, 6, 0),
                 Opacity = 0.8,
                 Tag = "favicon",
-                Visibility = Visibility.Collapsed
+                Visibility = Visibility.Collapsed,
+                VerticalAlignment = VerticalAlignment.Center
             };
             RenderOptions.SetBitmapScalingMode(favicon, BitmapScalingMode.HighQuality);
+            Grid.SetColumn(favicon, 0);
 
-            // Indicador de audio
             var audioIndicator = new TextBlock
             {
                 Text = "🔊",
@@ -2179,27 +2378,42 @@ namespace atsukibrowser
                 Tag = "audio",
                 VerticalAlignment = VerticalAlignment.Center
             };
+            Grid.SetColumn(audioIndicator, 1);
 
             var label = new TextBlock
             {
                 Text = titulo,
                 Foreground = Brushes.White,
                 VerticalAlignment = VerticalAlignment.Center,
-                MaxWidth = 120,
                 TextTrimming = TextTrimming.CharacterEllipsis,
-                Tag = "label"
+                Tag = "label",
+                Margin = new Thickness(0, 0, 4, 0)
             };
+            Grid.SetColumn(label, 2);
 
             var closeBtn = new Button
             {
                 Content = "×",
-                Background = Brushes.Transparent,
-                Foreground = new SolidColorBrush(Color.FromArgb(150, 255, 255, 255)),
+                Width = 18,
+                Height = 18,
+                Background = new SolidColorBrush(Color.FromArgb(0, 255, 255, 255)),
+                Foreground = new SolidColorBrush(Color.FromArgb(180, 255, 255, 255)),
                 BorderThickness = new Thickness(0),
-                FontSize = 14,
-                Padding = new Thickness(4, 0, 0, 0),
-                Cursor = Cursors.Hand
+                FontSize = 13,
+                Padding = new Thickness(0),
+                Cursor = Cursors.Hand,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0),
+                Visibility = Visibility.Collapsed
             };
+            Grid.SetColumn(closeBtn, 3);
+
+            closeBtn.MouseEnter += (s, e) =>
+                closeBtn.Background = new SolidColorBrush(Color.FromArgb(60, 255, 80, 80));
+            closeBtn.MouseLeave += (s, e) =>
+                closeBtn.Background = new SolidColorBrush(Color.FromArgb(0, 255, 255, 255));
 
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(closeBtn, true);
 
@@ -2211,16 +2425,41 @@ namespace atsukibrowser
             var btn = new Button
             {
                 Content = panel,
-                Background = Brushes.Transparent,
                 Foreground = Brushes.White,
                 BorderThickness = new Thickness(0),
                 Padding = new Thickness(12, 0, 8, 0),
-                Height = 30,
+                Height = 34,
                 MinWidth = 80,
-                MaxWidth = 200,
+                MaxWidth = 220,
                 Cursor = Cursors.Hand,
                 AllowDrop = true,
-                Tag = label
+                Tag = label,
+                HorizontalContentAlignment = HorizontalAlignment.Left,
+                Background = new SolidColorBrush(Color.FromArgb(255, 18, 16, 32))
+            };
+
+            // Template con bordes redondeados arriba
+            var factory = new FrameworkElementFactory(typeof(Border));
+            factory.SetValue(Border.CornerRadiusProperty, new CornerRadius(7, 7, 0, 0));
+            factory.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Button.BackgroundProperty));
+            factory.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Button.PaddingProperty));
+            var cpFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            cpFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            factory.AppendChild(cpFactory);
+            btn.Template = new ControlTemplate(typeof(Button)) { VisualTree = factory };
+
+            // Hover suave
+            btn.MouseEnter += (s, e) =>
+            {
+                int idx = _tabButtons.IndexOf(btn);
+                if (idx != _activeTab)
+                    btn.Background = new SolidColorBrush(Color.FromArgb(255, 35, 30, 60));
+            };
+            btn.MouseLeave += (s, e) =>
+            {
+                int idx = _tabButtons.IndexOf(btn);
+                if (idx != _activeTab)
+                    btn.Background = new SolidColorBrush(Color.FromArgb(255, 18, 16, 32));
             };
 
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(btn, true);
@@ -2389,18 +2628,58 @@ namespace atsukibrowser
 
             // ── Vista previa al hacer hover ──
             btn.MouseEnter += (s, e) => IniciarHoverPreview(btn);
-            btn.MouseLeave += (s, e) => CerrarHoverPreview();
+            btn.MouseLeave += (s, e) =>
+            {
+                // Solo cerrar si el mouse realmente salió del botón completo
+                if (!btn.IsMouseOver)
+                    CerrarHoverPreview();
+            };
 
             return btn;
         }
 
         private void ActualizarEstiloTabs()
         {
-            for (int i = 0; i < _tabButtons.Count; i++)
+            int count = _tabButtons.Count;
+            if (count == 0) return;
+
+            // Ancho disponible para las tabs (igual que Chrome)
+            double espacioDisponible = TabScrollViewer.ActualWidth - 34; // 34 = botón "+"
+            double anchoIdeal   = 200;
+            double anchoMinimo  = 60;
+            double anchoCalculado = Math.Max(anchoMinimo, Math.Min(anchoIdeal, espacioDisponible / count));
+
+            for (int i = 0; i < count; i++)
             {
-                _tabButtons[i].Background = i == _activeTab
-                    ? new SolidColorBrush(Color.FromArgb(255, 40, 36, 65))
+                var btn = _tabButtons[i];
+                btn.Width = anchoCalculado;
+
+                bool activa = i == _activeTab;
+                btn.Background = activa
+                    ? new SolidColorBrush(Color.FromArgb(255, 55, 45, 90))
                     : new SolidColorBrush(Color.FromArgb(255, 18, 16, 32));
+
+                // Botón cerrar: siempre visible, con hover en inactivas
+                if (btn.Content is Grid sp)
+                {
+                    var close = sp.Children.OfType<Button>().FirstOrDefault();
+                    if (close != null)
+                    {
+                        close.Visibility = Visibility.Visible;
+
+                        if (!activa)
+                        {
+                            // Mostrar solo al hacer hover sobre la pestaña
+                            btn.MouseEnter -= (s, e) => close.Visibility = Visibility.Visible;
+                            btn.MouseLeave -= (s, e) => close.Visibility = Visibility.Collapsed;
+
+                            close.Visibility = btn.IsMouseOver ? Visibility.Visible : Visibility.Collapsed;
+
+                            btn.MouseEnter += (s, e) => close.Visibility = Visibility.Visible;
+                            btn.MouseLeave += (s, e) => close.Visibility = Visibility.Collapsed;
+                        }
+                    }
+                }
             }
         }
 
@@ -2412,6 +2691,36 @@ namespace atsukibrowser
                 {
                     if (i != index)
                     {
+                        // Capturar preview de forma diferida sin bloquear
+                        int captureIdx = i;
+                        _ = Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await Task.Delay(200); // esperar a que la tab se colapse
+                                using var stream = new MemoryStream();
+                                await Dispatcher.InvokeAsync(async () =>
+                                {
+                                    if (captureIdx < _tabs.Count && _tabs[captureIdx].CoreWebView2 != null)
+                                        await _tabs[captureIdx].CoreWebView2.CapturePreviewAsync(
+                                            CoreWebView2CapturePreviewImageFormat.Png, stream);
+                                }).Task;
+                                stream.Position = 0;
+                                var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                                bmp.BeginInit();
+                                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                                bmp.StreamSource = stream;
+                                bmp.EndInit();
+                                bmp.Freeze();
+                                await Dispatcher.InvokeAsync(() =>
+                                {
+                                    if (captureIdx < _tabs.Count)
+                                        _tabPreviews[captureIdx] = bmp;
+                                });
+                            }
+                            catch { }
+                        });
+
                         _tabs[i].Visibility = Visibility.Collapsed;
 
                         if (_tabs[i].CoreWebView2 != null)
@@ -2460,9 +2769,10 @@ namespace atsukibrowser
             }
 
             _activeTab = index;
+            _ignorarGotFocus = true;
             UrlBar.Text = _tabs[index].Source?.ToString() ?? "";
+            _ignorarGotFocus = false;
             ActualizarEstiloTabs();
-            ActualizarZoomLabel();
         }
 
         private void ActualizarColorBotones()
@@ -2535,6 +2845,13 @@ namespace atsukibrowser
             {
                 if (_tabs.Count > 0)
                     _tabs[_activeTab].Source = new Uri(url);
+                    // Forzar pérdida de foco con delay para que WebView2 esté listo
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        Keyboard.ClearFocus();
+                        FocusManager.SetFocusedElement(this, _tabs[_activeTab]);
+                        _tabs[_activeTab].Focus();
+                    }), System.Windows.Threading.DispatcherPriority.Input);
             });
         }
 
@@ -2564,8 +2881,11 @@ namespace atsukibrowser
                 // URL bar solo si es la tab activa
                 if (index == _activeTab)
                 {
+                    _ignorarGotFocus = true;
                     UrlBar.Text = url;
                     ActualizarUrlDisplay(url);
+                    SugerenciasPopup.IsOpen = false;
+                    _ignorarGotFocus = false;
                 }
 
                 if (_tabButtons[index].Tag is TextBlock label)
@@ -2573,6 +2893,9 @@ namespace atsukibrowser
 
                 _historial.Agregar(url, titulo);
                 ActualizarFaviconTab(index, url); // ← ahora para todas las tabs
+                // Actualizar label si es la tab activa
+                if (index == _activeTab)
+                    Dispatcher.Invoke(ActualizarZoomLabel);
             });
 
             ActualizarEstrellaFavorito();
@@ -2581,7 +2904,7 @@ namespace atsukibrowser
         private async void ActualizarFaviconTab(int index, string url)
         {
             if (index < 0 || index >= _tabButtons.Count) return;
-            if (_tabButtons[index].Content is not StackPanel panel) return;
+            if (_tabButtons[index].Content is not Grid panel) return;
 
             var favicon = panel.Children.OfType<Image>()
                 .FirstOrDefault(i => i.Tag?.ToString() == "favicon");
@@ -2606,11 +2929,10 @@ namespace atsukibrowser
             {
                 var bytes = await _httpClient.GetByteArrayAsync(faviconUrl);
 
-                // Todo el trabajo de bitmap y UI en el hilo UI, sin Dispatcher anidado
                 await Dispatcher.InvokeAsync(() =>
                 {
                     if (index >= _tabButtons.Count) return;
-                    if (_tabButtons[index].Content is not StackPanel p) return;
+                    if (_tabButtons[index].Content is not Grid p) return;
                     var f = p.Children.OfType<Image>()
                         .FirstOrDefault(i => i.Tag?.ToString() == "favicon");
                     if (f == null) return;
@@ -2625,7 +2947,6 @@ namespace atsukibrowser
                         bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
                         bmp.EndInit();
                         bmp.Freeze();
-                        // stream puede quedar vivo — Freeze() ya copió los datos
 
                         f.Source = bmp;
                         f.Visibility = Visibility.Visible;
@@ -2647,7 +2968,7 @@ namespace atsukibrowser
                 {
                     int i = _tabs.IndexOf(webView);
                     if (i < 0 || i >= _tabButtons.Count) return;
-                    if (_tabButtons[i].Content is not StackPanel panel) return;
+                    if (_tabButtons[i].Content is not Grid panel) return;
                     var indicator = panel.Children.OfType<TextBlock>()
                         .FirstOrDefault(t => t.Tag?.ToString() == "audio");
                     if (indicator != null)
@@ -2767,14 +3088,37 @@ namespace atsukibrowser
             if (string.IsNullOrWhiteSpace(input) || _activeTab < 0) return;
 
             string url;
-            if (input.StartsWith("http://") || input.StartsWith("https://"))
+            if (input.StartsWith("http://") || input.StartsWith("https://") ||
+                input.StartsWith("file:///"))
                 url = input;
-            else if (input.Contains(".") && !input.Contains(" "))
+            else if (input.StartsWith("edge://") || input.StartsWith("chrome://") ||
+                    input.StartsWith("about:") || input.StartsWith("view-source:"))
+                url = input; // protocolos internos del navegador
+            else if (EsUrlDirecta(input))
                 url = "https://" + input;
             else
                 url = GetUrlBusqueda(input);
 
             _tabs[_activeTab].Source = new Uri(url);
+        }
+
+        private bool EsUrlDirecta(string input)
+        {
+            // Debe tener un punto, sin espacios
+            if (input.Contains(" ") || !input.Contains(".")) return false;
+
+            // Extraer el dominio (antes del primer / o ?)
+            string dominio = input.Split('/', '?')[0];
+
+            // El TLD debe ser solo letras y tener entre 2 y 6 caracteres
+            string[] partes = dominio.Split('.');
+            string tld = partes[^1];
+            if (tld.Length < 2 || tld.Length > 6 || !tld.All(char.IsLetter)) return false;
+
+            // El dominio principal no puede ser solo números (ej: "3.14" no es URL)
+            if (partes.Length >= 2 && partes[^2].All(char.IsDigit)) return false;
+
+            return true;
         }
 
         // ── Eventos de UI ────────────────────────────────────
@@ -2788,7 +3132,16 @@ namespace atsukibrowser
             if (e.Key == Key.Enter)
             {
                 SugerenciasPopup.IsOpen = false;
-                Navegar(UrlBar.Text);
+                var texto = UrlBar.Text;
+                Navegar(texto);
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    SugerenciasPopup.IsOpen = false; // doble cierre por si acaso
+                    Keyboard.ClearFocus();
+                    FocusManager.SetFocusedElement(this, _tabs[_activeTab]);
+                    _tabs[_activeTab].Focus();
+                }), System.Windows.Threading.DispatcherPriority.Input);
+                e.Handled = true;
                 return;
             }
             if (e.Key == Key.Escape)
@@ -2834,9 +3187,39 @@ namespace atsukibrowser
                 WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
                 e.Handled = true;
             }
-            else if (_atajos.Coincide("zoom_mas",   ctrl, shift, alt, tecla)) { if (_activeTab >= 0) { _tabs[_activeTab].ZoomFactor = Math.Min(_tabs[_activeTab].ZoomFactor + 0.1, 3.0); ActualizarZoomLabel(); } e.Handled = true; }
-            else if (_atajos.Coincide("zoom_menos", ctrl, shift, alt, tecla)) { if (_activeTab >= 0) { _tabs[_activeTab].ZoomFactor = Math.Max(_tabs[_activeTab].ZoomFactor - 0.1, 0.25); ActualizarZoomLabel(); } e.Handled = true; }
-            else if (_atajos.Coincide("zoom_reset", ctrl, shift, alt, tecla)) { if (_activeTab >= 0) { _tabs[_activeTab].ZoomFactor = 1.0; ActualizarZoomLabel(); } e.Handled = true; }
+            else if (_atajos.Coincide("zoom_mas", ctrl, shift, alt, tecla))
+            {
+                if (_activeTab >= 0)
+                {
+                    _tabs[_activeTab].ZoomFactor = Math.Min(_tabs[_activeTab].ZoomFactor + 0.1, 3.0);
+                    ActualizarZoomLabel();
+                    string dominio = GetDominioZoom(_tabs[_activeTab].Source?.ToString() ?? "");
+                    if (!string.IsNullOrEmpty(dominio)) _zoomPorDominio[dominio] = _tabs[_activeTab].ZoomFactor;
+                }
+                e.Handled = true;
+            }
+            else if (_atajos.Coincide("zoom_menos", ctrl, shift, alt, tecla))
+            {
+                if (_activeTab >= 0)
+                {
+                    _tabs[_activeTab].ZoomFactor = Math.Max(_tabs[_activeTab].ZoomFactor - 0.1, 0.25);
+                    ActualizarZoomLabel();
+                    string dominio = GetDominioZoom(_tabs[_activeTab].Source?.ToString() ?? "");
+                    if (!string.IsNullOrEmpty(dominio)) _zoomPorDominio[dominio] = _tabs[_activeTab].ZoomFactor;
+                }
+                e.Handled = true;
+            }
+            else if (_atajos.Coincide("zoom_reset", ctrl, shift, alt, tecla))
+            {
+                if (_activeTab >= 0)
+                {
+                    _tabs[_activeTab].ZoomFactor = 1.0;
+                    ActualizarZoomLabel();
+                    string dominio = GetDominioZoom(_tabs[_activeTab].Source?.ToString() ?? "");
+                    if (!string.IsNullOrEmpty(dominio)) _zoomPorDominio.Remove(dominio);
+                }
+                e.Handled = true;
+            }
             else if (_atajos.Coincide("favoritos",  ctrl, shift, alt, tecla)) { AbrirONavegar(_urlFavoritos); e.Handled = true; }
             else if (_atajos.Coincide("historial",  ctrl, shift, alt, tecla)) { AbrirONavegar(_urlHistorial); e.Handled = true; }
             else if (_atajos.Coincide("descargas",  ctrl, shift, alt, tecla)) { AbrirONavegar(_urlDescargas); e.Handled = true; }
@@ -2894,63 +3277,106 @@ namespace atsukibrowser
             }
             else if (e.Key == Key.Escape && _activeTab >= 0)
             {
+                _ignorarGotFocus = true;
                 UrlBar.Text = _tabs[_activeTab].Source?.ToString() ?? "";
+                _ignorarGotFocus = false;
+                SugerenciasPopup.IsOpen = false;
             }
         }
 
         private void SugerenciasList_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            if (SugerenciasList.SelectedItem is string sug)
+            if (SugerenciasList.SelectedItem is SugerenciaItem sug)
             {
                 SugerenciasPopup.IsOpen = false;
-                UrlBar.Text = sug;
-                Navegar(sug);
+                UrlBar.Text = sug.Url;
+                Navegar(sug.Url);
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    Keyboard.ClearFocus();
+                    FocusManager.SetFocusedElement(this, _tabs[_activeTab]);
+                    _tabs[_activeTab].Focus();
+                }), System.Windows.Threading.DispatcherPriority.Input);
             }
         }
 
         private void SugerenciasList_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter && SugerenciasList.SelectedItem is string sug)
+            if (e.Key == Key.Enter && SugerenciasList.SelectedItem is SugerenciaItem sug)
             {
                 SugerenciasPopup.IsOpen = false;
-                Navegar(sug);
+                UrlBar.Text = sug.Url;
+                Navegar(sug.Url);
             }
             if (e.Key == Key.Escape)
                 SugerenciasPopup.IsOpen = false;
         }
-
         private void UrlBar_GotFocus(object sender, RoutedEventArgs e)
         {
+            if (_ignorarGotFocus) return;
+            // Ocultar placeholder si estaba visible
             UrlDisplay.Visibility = Visibility.Collapsed;
             UrlBar.Visibility = Visibility.Visible;
-            UrlBar.SelectAll();
 
-            // Mostrar historial reciente si la barra está vacía
-            if (string.IsNullOrWhiteSpace(UrlBar.Text))
+            // Si era el placeholder, limpiar para no seleccionarlo
+            if (UrlBar.Text == "")
+                UrlBar.Text = "";
+
+            _ignorarTextChanged = true;
+            UrlBar.SelectAll();
+            _ignorarTextChanged = false;
+
+            // Mostrar historial reciente SOLO si el usuario hizo click manualmente
+            if (string.IsNullOrWhiteSpace(UrlBar.Text) && _urlBarClickado)
             {
-                var recientes = _historial.Entradas.Take(6).ToList();
+            
+                var recientes = _historial.Entradas
+                    .Where(h => !string.IsNullOrEmpty(h.Url) &&
+                                !h.Url.Contains("google.com/search") &&
+                                !h.Url.Contains("bing.com/search"))
+                    .Take(6)
+                    .ToList();
                 if (recientes.Count == 0) return;
 
                 SugerenciasList.Items.Clear();
                 foreach (var h in recientes)
-                    SugerenciasList.Items.Add($"🕐 {h.Titulo ?? h.Url}");
+                    SugerenciasList.Items.Add(new SugerenciaItem
+                {
+                    Icono = "🕐",
+                    Titulo = h.Titulo ?? h.Url,
+                    Subtitulo = h.Url,
+                    Url = h.Url,
+                    FaviconUrl = $"https://www.google.com/s2/favicons?domain={new Uri(h.Url).Host}&sz=32"
+                });
 
-                SugerenciasPopup.IsOpen = true;
+            SugerenciasPopup.PlacementTarget = UrlBarBorder;
+            SugerenciasPopup.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+            SugerenciasPopup.Width = UrlBarBorder.ActualWidth;
+            SugerenciasPopup.IsOpen = true;
             }
+            _urlBarClickado = false;
         }
 
         private void UrlBar_LostFocus(object sender, RoutedEventArgs e)
         {
-            SugerenciasPopup.IsOpen = false;
-            ActualizarUrlDisplay(UrlBar.Text);
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                SugerenciasPopup.IsOpen = false;
+                ActualizarUrlDisplay(UrlBar.Text);
+            }), System.Windows.Threading.DispatcherPriority.Background);
+            _urlBarClickado = false;
         }
 
         private async void UrlBar_TextChanged(object sender, TextChangedEventArgs e)
         {
+            if (_ignorarTextChanged) return;
+            if (_ignorarGotFocus) return;
             var texto = UrlBar.Text.Trim();
-            if (string.IsNullOrEmpty(texto) || texto.StartsWith("http"))
+            if (string.IsNullOrEmpty(texto))
             {
-                SugerenciasPopup.IsOpen = false;
+                // Solo cerrar si no hay recientes visibles
+                if (SugerenciasList.Items.Count == 0)
+                    SugerenciasPopup.IsOpen = false;
                 return;
             }
 
@@ -2963,29 +3389,76 @@ namespace atsukibrowser
                 await Task.Delay(200, token);
                 if (token.IsCancellationRequested) return;
 
-                _httpClient.DefaultRequestHeaders.Remove("User-Agent");
-                _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0");
-                var url = $"https://suggestqueries.google.com/complete/search?client=firefox&q={Uri.EscapeDataString(texto)}";
-                var res = await _httpClient.GetStringAsync(url);
-                if (token.IsCancellationRequested) return;
-
-                // Parsear respuesta: ["query", ["sug1","sug2",...]]
-                using var doc = System.Text.Json.JsonDocument.Parse(res);
-                var sugs = doc.RootElement[1].EnumerateArray()
-                    .Take(7)
-                    .Select(s => s.GetString() ?? "")
-                    .Where(s => !string.IsNullOrEmpty(s))
+                // Sugerencias del historial que coincidan
+                var delHistorial = _historial.Entradas
+                    .Where(h => !string.IsNullOrEmpty(h.Url) &&
+                                !h.Url.Contains("google.com/search") &&
+                                !h.Url.Contains("bing.com/search") &&
+                                ((h.Titulo ?? "").Contains(texto, StringComparison.OrdinalIgnoreCase)
+                                || (h.Url ?? "").Contains(texto, StringComparison.OrdinalIgnoreCase)))
+                    .Take(3)
                     .ToList();
+
+                // Sugerencias de Google (solo si no es una URL)
+                var delBuscador = new List<string>();
+                if (!texto.StartsWith("http"))
+                {
+                    try
+                    {
+                        var url = $"https://suggestqueries.google.com/complete/search?client=firefox&q={Uri.EscapeDataString(texto)}";
+                        var res = await _httpClient.GetStringAsync(url);
+                        if (token.IsCancellationRequested) return;
+
+                        using var doc = System.Text.Json.JsonDocument.Parse(res);
+                        delBuscador = doc.RootElement[1].EnumerateArray()
+                            .Take(6)
+                            .Select(s => s.GetString() ?? "")
+                            .Where(s => !string.IsNullOrEmpty(s))
+                            .ToList();
+                    }
+                    catch { }
+                }
+
+                if (token.IsCancellationRequested) return;
 
                 Dispatcher.Invoke(() =>
                 {
                     SugerenciasList.Items.Clear();
-                    foreach (var sug in sugs)
-                        SugerenciasList.Items.Add(sug);
 
-                    SugerenciasPopup.IsOpen = sugs.Count > 0;
+                    foreach (var h in delHistorial)
+                        SugerenciasList.Items.Add(new SugerenciaItem
+                        {
+                            Icono = "🕐",
+                            Titulo = h.Titulo ?? h.Url,
+                            Subtitulo = h.Url,
+                            Url = h.Url,
+                            FaviconUrl = $"https://www.google.com/s2/favicons?domain={new Uri(h.Url).Host}&sz=32"
+                        });
+
+                    foreach (var sug in delBuscador)
+                        SugerenciasList.Items.Add(new SugerenciaItem
+                        {
+                            Icono = "🔍",
+                            Titulo = sug,
+                            Subtitulo = "",
+                            Url = sug,
+                            FaviconUrl = ""
+                        });
+
+                    if (SugerenciasList.Items.Count > 0)
+                    {
+                        SugerenciasPopup.PlacementTarget = UrlBarBorder;
+                        SugerenciasPopup.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom;
+                        SugerenciasPopup.Width = UrlBarBorder.ActualWidth;
+                        SugerenciasPopup.IsOpen = true;
+                    }
+                    else
+                    {
+                        SugerenciasPopup.IsOpen = false;
+                    }
                 });
             }
+            catch (TaskCanceledException) { }
             catch { }
         }
 
@@ -3163,6 +3636,8 @@ namespace atsukibrowser
         {
             SidebarTop.Children.Clear();
             SidebarBottom.Children.Clear();
+            var iconColor = Color.FromArgb(180, _accentColor.R, _accentColor.G, _accentColor.B);
+            var iconBrush = new SolidColorBrush(iconColor);
 
             foreach (var item in _sidebar.Items)
             {
@@ -3217,7 +3692,7 @@ namespace atsukibrowser
                             {
                                 Text = string.IsNullOrEmpty(item.Emoji) ? "🌐" : item.Emoji,
                                 FontSize = 18,
-                                Foreground = new SolidColorBrush(Color.FromRgb(68, 68, 102))
+                                Foreground = iconBrush
                             });
                         };
                     }
@@ -3227,7 +3702,7 @@ namespace atsukibrowser
                         {
                             Text = string.IsNullOrEmpty(item.Emoji) ? "🌐" : item.Emoji,
                             FontSize = 18,
-                            Foreground = new SolidColorBrush(Color.FromRgb(68, 68, 102))
+                            Foreground = iconBrush
                         };
                         goto skipImage;
                     }
@@ -3235,10 +3710,10 @@ namespace atsukibrowser
                     btn.Content = img;
                     skipImage:;
                 }
-                else if (item.Id is "home" or "favoritos" or "historial" or "descargas" or "ajustes")
+                else if (item.Id is "home" or "favoritos" or "historial" or "descargas" or "ajustes" or "perfiles" or "extensiones" or "atajos" or "privacidad" or "rendimiento" or "nuevatab")
                 {
                     // SVG para items de sistema
-                    btn.Content = CrearIconoSistema(item.Id);
+                    btn.Content = CrearIconoSistema(item.Id, iconBrush);
                 }
                 else
                 {
@@ -3247,7 +3722,7 @@ namespace atsukibrowser
                     {
                         Text = string.IsNullOrEmpty(item.Emoji) ? "🌐" : item.Emoji,
                         FontSize = 18,
-                        Foreground = new SolidColorBrush(Color.FromRgb(68, 68, 102))
+                        Foreground = iconBrush
                     };
                 }
 
@@ -3276,6 +3751,31 @@ namespace atsukibrowser
                 else
                     SidebarTop.Children.Add(btn);
             }
+
+            // ── Botón AtsukiMusic ──
+            var btnMusica = new Button
+            {
+                Width = 52, Height = 42,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                ToolTip = "AtsukiMusic",
+                Content = new TextBlock
+                {
+                    Text = "🎵",
+                    FontSize = 18,
+                    Foreground = iconBrush
+                }
+            };
+            btnMusica.Click += async (s, e) =>
+            {
+                await InicializarMusicaWebView();
+                _musicaPanelAbierto = !_musicaPanelAbierto;
+                MusicaPanel.Visibility = _musicaPanelAbierto
+                    ? Visibility.Visible : Visibility.Collapsed;
+                SidebarColumn.Width = new GridLength(_musicaPanelAbierto ? 332 : 52);
+            };
+            SidebarTop.Children.Add(btnMusica);
             // Widget de rendimiento al final
             if (_sbWidgetRendimiento || _sbWidgetReloj)
             {
@@ -3304,12 +3804,7 @@ namespace atsukibrowser
                     BorderThickness = new Thickness(0),
                     Cursor = Cursors.Hand,
                     ToolTip = "Captura de pantalla",
-                    Content = new TextBlock
-                    {
-                        Text = "📷",
-                        FontSize = 18,
-                        Foreground = new SolidColorBrush(Color.FromRgb(68, 68, 102))
-                    }
+                    Content = CrearIconoSistema("captura", iconBrush)
                 };
                 btnCaptura.Click += async (s, e) =>
                 {
@@ -3355,12 +3850,7 @@ namespace atsukibrowser
                     BorderThickness = new Thickness(0),
                     Cursor = Cursors.Hand,
                     ToolTip = "Búsqueda rápida",
-                    Content = new TextBlock
-                    {
-                        Text = "🔍",
-                        FontSize = 18,
-                        Foreground = new SolidColorBrush(Color.FromRgb(68, 68, 102))
-                    }
+                    Content = CrearIconoSistema("buscador", iconBrush)
                 };
                 btnBuscar.Click += (s, e) =>
                 {
@@ -3430,31 +3920,32 @@ namespace atsukibrowser
         private void AplicarColorSVG(string colorHex)
         {
             var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(colorHex));
-            var brushMuted = new SolidColorBrush(Color.FromArgb(120,
+            var brushMuted = new SolidColorBrush(Color.FromArgb(180,
                 brush.Color.R, brush.Color.G, brush.Color.B));
 
             // Navbar
-            SetPathStroke(BtnBack,    brushMuted);
-            SetPathStroke(BtnForward, brushMuted);
-            SetPathStroke(BtnReload,  brushMuted);
+            SetPathStroke(BtnBack,     brushMuted);
+            SetPathStroke(BtnForward,  brushMuted);
+            SetPathStroke(BtnReload,   brushMuted);
             SetPathStroke(BtnFavorito, brushMuted);
-            SetPathStroke(BtnAjustes, brushMuted);
-            SetPathStroke(BtnMenu,    brushMuted);
+            SetPathStroke(BtnAjustes,  brushMuted);
+            SetPathStroke(BtnMenu,     brushMuted);
 
-            // Sidebar dinámico
-            foreach (var child in SidebarTop.Children)
+            // Sidebar completo (Top + Bottom)
+            foreach (var panel in new[] { SidebarTop.Children, SidebarBottom.Children })
             {
-                if (child is Button b)
-                    SetPathStroke(b, brushMuted);
+                foreach (UIElement child in panel)
+                {
+                    if (child is Button b)
+                        SetPathStroke(b, brushMuted);
+                }
             }
         }
 
         private void SetPathStroke(Button btn, Brush brush)
         {
             if (btn?.Content is Viewbox vb)
-            {
                 ApplyStrokeToChildren(vb, brush);
-            }
         }
 
         private void ApplyStrokeToChildren(DependencyObject parent, Brush brush)
@@ -3474,6 +3965,7 @@ namespace atsukibrowser
             Dispatcher.Invoke(() =>
             {
                 var accent   = (Color)ColorConverter.ConvertFromString(t.Accent);
+                _accentColor = accent;
                 var bg       = (Color)ColorConverter.ConvertFromString(t.Bg);
                 var surface  = (Color)ColorConverter.ConvertFromString(t.Surface);
                 var surface2 = (Color)ColorConverter.ConvertFromString(t.Surface2);
@@ -3495,7 +3987,35 @@ namespace atsukibrowser
 
                 Sidebar.Background          = new SolidColorBrush(Color.FromArgb(255, 10, 10, 16));
                 Sidebar.BorderBrush         = new SolidColorBrush(borderColor);
+
+                // Texto del sidebar
+                var mutedColor = Color.FromArgb(255, 170, 170, 200);
+                var accentBrush = new SolidColorBrush(accent);
+                var mutedBrush = new SolidColorBrush(mutedColor);
+
+                // Botones minimizar/maximizar/cerrar
+                BtnMinimize.Foreground = mutedBrush;
+                BtnMaximize.Foreground = mutedBrush;
+                BtnClose.Foreground    = mutedBrush;
+
+                // Paths de botones de navegación
+                var navStroke = new SolidColorBrush(Color.FromArgb(255,
+                    (byte)(accent.R / 2), (byte)(accent.G / 2), (byte)(accent.B / 2 + 80)));
+
+                foreach (var btn in new[] { BtnBack, BtnForward, BtnReload })
+                {
+                    foreach (var path in FindVisualChildren<System.Windows.Shapes.Path>(btn))
+                        path.Stroke = mutedBrush;
+                }
+
+                // Texto de la tabbar y sidebar
+                TabBar.Background = new SolidColorBrush(bg);
+
+                // Fondo activo del sidebar usando el accent
+                foreach (var btn in _tabButtons)
+                    btn.Foreground = mutedBrush;
             });
+            RenderizarSidebar();
             AplicarColorSVG(t.Accent);
         }
 
@@ -3545,6 +4065,15 @@ namespace atsukibrowser
 
         protected override void OnClosed(EventArgs e)
         {
+            // Detener música inmediatamente
+            try
+            {
+                _musicaWebView?.CoreWebView2?.PostWebMessageAsString("player:pause");
+                _musicaWebView?.CoreWebView2?.Stop();
+                _musicaWebView?.Dispose();
+            }
+            catch { }
+
             foreach (var tab in _tabs)
             {
                 try
@@ -3563,14 +4092,22 @@ namespace atsukibrowser
         private void BtnZoomIn_Click(object sender, RoutedEventArgs e)
         {
             if (_activeTab < 0) return;
+           _aplicandoZoom = true;
             _tabs[_activeTab].ZoomFactor = Math.Min(_tabs[_activeTab].ZoomFactor + 0.1, 3.0);
+            _aplicandoZoom = false;
+            string dominio = GetDominioZoom(_tabs[_activeTab].Source?.ToString() ?? "");
+            if (!string.IsNullOrEmpty(dominio)) _zoomPorDominio[dominio] = _tabs[_activeTab].ZoomFactor;
             ActualizarZoomLabel();
         }
 
         private void BtnZoomOut_Click(object sender, RoutedEventArgs e)
         {
             if (_activeTab < 0) return;
+            _aplicandoZoom = true;
             _tabs[_activeTab].ZoomFactor = Math.Max(_tabs[_activeTab].ZoomFactor - 0.1, 0.25);
+            _aplicandoZoom = false;
+            string dominio = GetDominioZoom(_tabs[_activeTab].Source?.ToString() ?? "");
+            if (!string.IsNullOrEmpty(dominio)) _zoomPorDominio[dominio] = _tabs[_activeTab].ZoomFactor;
             ActualizarZoomLabel();
         }
 
@@ -3579,6 +4116,63 @@ namespace atsukibrowser
             if (_activeTab < 0) return;
             int pct = (int)Math.Round(_tabs[_activeTab].ZoomFactor * 100);
             ZoomLabel.Text = pct + "%";
+        }
+
+        private void ZoomLabel_GotFocus(object sender, RoutedEventArgs e)
+        {
+            // Quitar el % al enfocar para facilitar edición
+            ZoomLabel.Text = ZoomLabel.Text.Replace("%", "");
+            ZoomLabel.SelectAll();
+        }
+
+        private void ZoomLabel_LostFocus(object sender, RoutedEventArgs e)
+        {
+            AplicarZoomDesdeLabel();
+        }
+
+        private void ZoomLabel_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                AplicarZoomDesdeLabel();
+                // Quitar foco del textbox
+                System.Windows.Input.Keyboard.ClearFocus();
+                e.Handled = true;
+            }
+            else if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                ActualizarZoomLabel(); // restaurar valor actual
+                System.Windows.Input.Keyboard.ClearFocus();
+                e.Handled = true;
+            }
+        }
+
+        private void AplicarZoomDesdeLabel()
+        {
+            if (_activeTab < 0) return;
+            string raw = ZoomLabel.Text.Replace("%", "").Trim();
+            if (int.TryParse(raw, out int pct))
+            {
+                double factor = Math.Max(0.25, Math.Min(3.0, pct / 100.0));
+                _aplicandoZoom = true;
+                _tabs[_activeTab].ZoomFactor = factor;
+                _aplicandoZoom = false;
+                string dominio = GetDominioZoom(_tabs[_activeTab].Source?.ToString() ?? "");
+                if (!string.IsNullOrEmpty(dominio)) _zoomPorDominio[dominio] = factor;
+            }
+            ActualizarZoomLabel();
+        }
+
+        private string GetDominioZoom(string url)
+        {
+            if (string.IsNullOrEmpty(url)) return "";
+            try
+            {
+                var uri = new Uri(url);
+                if (uri.Scheme == "file") return url; // usar URL completa para páginas locales
+                return uri.Host;
+            }
+            catch { return url; }
         }
 
         private void MenuPerfil_Click(object sender, RoutedEventArgs e)
@@ -3651,24 +4245,11 @@ namespace atsukibrowser
             return template;
         }
 
-        private UIElement CrearIconoSistema(string id)
+        private UIElement CrearIconoSistema(string id, SolidColorBrush iconBrush = null)
         {
-            var color = new SolidColorBrush(Color.FromRgb(68, 68, 102));
-            string data = id switch
-            {
-                "home"      => "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10",
-                "favoritos" => "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z",
-                "historial" => "M12 8v4l3 3",
-                "descargas" => "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3",
-                "ajustes"   => "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
-                "extensiones" => "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z",
-                _           => ""
-            };
+            var color = iconBrush ?? new SolidColorBrush(Color.FromRgb(68, 68, 102));
 
-            if (string.IsNullOrEmpty(data))
-                return new TextBlock { Text = "•", FontSize = 18, Foreground = color };
-
-            // Para historial necesitamos Canvas con múltiples paths
+            // IDs que requieren múltiples paths (Canvas)
             if (id == "historial")
             {
                 var canvas = new Canvas { Width = 24, Height = 24 };
@@ -3693,6 +4274,51 @@ namespace atsukibrowser
                 }
                 return new Viewbox { Width = 18, Height = 18, Child = canvas };
             }
+
+            if (id == "extensiones")
+            {
+                // Icono puzzle (extensiones)
+                var canvas = new Canvas { Width = 24, Height = 24 };
+                string[] paths = new[]
+                {
+                    "M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z",
+                    "M16 8 2 22",
+                    "M17.5 15H9"
+                };
+                foreach (var d in paths)
+                {
+                    canvas.Children.Add(new System.Windows.Shapes.Path
+                    {
+                        Data = Geometry.Parse(d),
+                        Stroke = color,
+                        StrokeThickness = 1.5,
+                        StrokeStartLineCap = PenLineCap.Round,
+                        StrokeEndLineCap = PenLineCap.Round,
+                        StrokeLineJoin = PenLineJoin.Round,
+                        Fill = Brushes.Transparent
+                    });
+                }
+                return new Viewbox { Width = 18, Height = 18, Child = canvas };
+            }
+
+            string data = id switch
+            {
+                "home"      => "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10",
+                "favoritos" => "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z",
+                "descargas" => "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3",
+                "ajustes"   => "M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+                "perfiles"  => "M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2 M12 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z",
+                "captura"   => "M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+                "buscador"  => "M11 17a6 6 0 1 0 0-12 6 6 0 0 0 0 12z M21 21l-4.35-4.35",
+                "atajos"      => "M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3",
+                "privacidad"  => "M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z",
+                "rendimiento" => "M22 12h-4l-3 9L9 3l-3 9H2",
+                "nuevatab"    => "M12 5v14 M5 12h14",
+                _           => ""
+            };
+
+            if (string.IsNullOrEmpty(data))
+                return new TextBlock { Text = "•", FontSize = 18, Foreground = color };
 
             return new Viewbox
             {
@@ -4223,29 +4849,46 @@ namespace atsukibrowser
 
             UrlDisplay.Inlines.Clear();
 
-            // Icono y color según protocolo
+            // Icono según protocolo
             if (url.StartsWith("https://"))
-            {
-                UrlIcono.Text = "🔒";
-                UrlIcono.Foreground = new SolidColorBrush(Color.FromRgb(52, 211, 153)); // verde
-            }
+                UrlIconoPath.Fill = new SolidColorBrush(Color.FromRgb(52, 211, 153));   // verde
             else if (url.StartsWith("http://"))
-            {
-                UrlIcono.Text = "⚠";
-                UrlIcono.Foreground = new SolidColorBrush(Color.FromRgb(251, 191, 36)); // amarillo
-            }
+                UrlIconoPath.Fill = new SolidColorBrush(Color.FromRgb(251, 191, 36));   // amarillo
+            else if (url.StartsWith("file:///"))
+                UrlIconoPath.Fill = new SolidColorBrush(Color.FromArgb(120, 200, 200, 255)); // azul tenue
             else
-            {
-                UrlIcono.Text = "🔒";
-                UrlIcono.Foreground = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255));
-            }
+                UrlIconoPath.Fill = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255)); // blanco tenue
 
             // Páginas internas
             if (url.StartsWith("file:///"))
             {
-                UrlIcono.Text = "🏠";
-                UrlIcono.Foreground = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255));
-                UrlDisplay.Inlines.Add(new System.Windows.Documents.Run(url)
+                // Nueva tab: barra vacía, como Chrome/Edge
+                if (url.Contains("NuevaTab.html"))
+                {
+                    UrlBar.Text = "";
+                    UrlDisplay.Inlines.Clear();
+                    UrlDisplay.Inlines.Add(new System.Windows.Documents.Run("Buscar o escribir una URL")
+                    {
+                        Foreground = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255))
+                    });
+                    UrlBar.Visibility = Visibility.Collapsed;
+                    UrlDisplay.Visibility = Visibility.Visible;
+                    return;
+                }
+
+                // Otras páginas internas: nombre amigable
+                string nombreAmigable = url switch
+                {
+                    var u when u.Contains("Historial.html")   => "atsuki://historial",
+                    var u when u.Contains("Favoritos.html")   => "atsuki://favoritos",
+                    var u when u.Contains("Ajustes.html")     => "atsuki://ajustes",
+                    var u when u.Contains("Descargas.html")   => "atsuki://descargas",
+                    var u when u.Contains("Extensiones.html") => "atsuki://extensiones",
+                    var u when u.Contains("Perfiles.html")    => "atsuki://perfiles",
+                    _ => url
+                };
+
+                UrlDisplay.Inlines.Add(new System.Windows.Documents.Run(nombreAmigable)
                 {
                     Foreground = new SolidColorBrush(Color.FromArgb(140, 255, 255, 255))
                 });
@@ -4258,15 +4901,14 @@ namespace atsukibrowser
             try
             {
                 var uri = new Uri(url);
-                string scheme  = uri.Scheme + "://";
-                string host    = uri.Host;
-                string resto   = url.Substring(scheme.Length + host.Length);
+                string scheme = uri.Scheme + "://";
+                string host   = uri.Host;
+                string resto  = url.Substring(scheme.Length + host.Length);
 
                 var muted  = new SolidColorBrush(Color.FromArgb(100, 170, 170, 204));
                 var normal = new SolidColorBrush(Color.FromArgb(180, 170, 170, 204));
                 var bright = new SolidColorBrush(Colors.White);
 
-                // Resaltar dominio: separar subdominio del dominio principal
                 var partes = host.Split('.');
                 string dominioPrincipal = partes.Length >= 2
                     ? string.Join(".", partes[^2], partes[^1])
@@ -4322,35 +4964,91 @@ namespace atsukibrowser
             {
                 _previewTimer?.Stop();
 
-                // Verificar que el índice sigue siendo válido y el mouse sigue sobre el botón
                 if (_previewTabIdx < 0 || _previewTabIdx >= _tabs.Count) return;
-                if (!btn.IsMouseOver) return; // ← cancelar si el mouse ya salió
+                if (!btn.IsMouseOver) return;
 
                 var tab = _tabs[_previewTabIdx];
                 if (tab.CoreWebView2 == null) return;
 
+                string url = tab.CoreWebView2.Source ?? "";
+                string titulo = tab.CoreWebView2.DocumentTitle is { Length: > 0 } t ? t : "Nueva pestaña";
+                bool esTabActiva = _previewTabIdx == _activeTab;
+
+                PreviewTabTitulo.Text = titulo;
+                PopupPreviewTab.PlacementTarget = btn;
+
                 try
                 {
-                    using var stream = new MemoryStream();
-                    await tab.CoreWebView2.CapturePreviewAsync(
-                        CoreWebView2CapturePreviewImageFormat.Png, stream);
-                    stream.Position = 0;
+                    // ── YouTube: thumbnail directo sin capturar ──
+                    var ytMatch = System.Text.RegularExpressions.Regex.Match(
+                        url, @"(?:v=|youtu\.be/)([A-Za-z0-9_-]{11})");
 
-                    var bmp = new System.Windows.Media.Imaging.BitmapImage();
-                    bmp.BeginInit();
-                    bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
-                    bmp.StreamSource = stream;
-                    bmp.EndInit();
-                    bmp.Freeze();
+                    if (ytMatch.Success)
+                    {
+                        string videoId = ytMatch.Groups[1].Value;
+                        string thumbUrl = $"https://img.youtube.com/vi/{videoId}/mqdefault.jpg";
+                        var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                        bmp.BeginInit();
+                        bmp.UriSource = new Uri(thumbUrl);
+                        bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        if (!btn.IsMouseOver) return;
+                        PreviewTabImagen.Source = bmp;
+                        PopupPreviewTab.IsOpen = true;
+                        return;
+                    }
 
-                    // Verificar de nuevo antes de mostrar
-                    if (!btn.IsMouseOver) return;
+                    // ── Tab activa: capturar en vivo ──
+                    if (esTabActiva)
+                    {
+                        using var stream = new MemoryStream();
+                        await tab.CoreWebView2.CapturePreviewAsync(
+                            CoreWebView2CapturePreviewImageFormat.Png, stream);
+                        stream.Position = 0;
+                        var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                        bmp.BeginInit();
+                        bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                        bmp.StreamSource = stream;
+                        bmp.EndInit();
+                        bmp.Freeze();
+                        if (!btn.IsMouseOver) return;
+                        PreviewTabImagen.Source = bmp;
+                        PopupPreviewTab.IsOpen = true;
+                        return;
+                    }
 
-                    PreviewTabImagen.Source = bmp;
-                    PreviewTabTitulo.Text = tab.CoreWebView2.DocumentTitle is { Length: > 0 } t ? t : "Nueva pestaña";
-
-                    PopupPreviewTab.PlacementTarget = btn;
-                    PopupPreviewTab.IsOpen = true;
+                    // ── Tabs en segundo plano: capturar o usar caché ──
+                    if (_tabPreviews.TryGetValue(_previewTabIdx, out var cached))
+                    {
+                        if (!btn.IsMouseOver) return;
+                        PreviewTabImagen.Source = cached;
+                        PopupPreviewTab.IsOpen = true;
+                    }
+                    else
+                    {
+                        // No hay caché — capturar ahora
+                        try
+                        {
+                            tab.Visibility = Visibility.Visible;
+                            using var stream = new MemoryStream();
+                            await tab.CoreWebView2.CapturePreviewAsync(
+                                CoreWebView2CapturePreviewImageFormat.Png, stream);
+                            tab.Visibility = Visibility.Collapsed;
+                            stream.Position = 0;
+                            var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                            bmp.BeginInit();
+                            bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+                            bmp.StreamSource = stream;
+                            bmp.EndInit();
+                            bmp.Freeze();
+                            _tabPreviews[_previewTabIdx] = bmp;
+                            if (!btn.IsMouseOver) return;
+                            PreviewTabImagen.Source = bmp;
+                            PopupPreviewTab.IsOpen = true;
+                        }
+                        catch { }
+                    }
                 }
                 catch { }
             };
@@ -4394,6 +5092,1002 @@ namespace atsukibrowser
                     ? WindowState.Normal
                     : WindowState.Maximized;
             }
+        }
+        private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent)
+            where T : DependencyObject
+        {
+            if (parent == null) yield break;
+            int count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < count; i++)
+            {
+                var child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+                if (child is T t) yield return t;
+                foreach (var c in FindVisualChildren<T>(child)) yield return c;
+            }
+        }
+        private async Task InicializarMusicaWebView()
+        {
+            if (_musicaInicializada) return;
+            _musicaInicializada = true;
+
+            _musicaWebView = new WebView2();
+            _musicaWebView.Width = 2;
+            _musicaWebView.Height = 2;
+            _musicaWebView.IsHitTestVisible = false;
+
+            // Contenedor con opacidad casi-cero para que Chromium NO lo trate como background
+            var musicaContainer = new Border
+            {
+                Width = 2,
+                Height = 2,
+                Opacity = 0.01,
+                IsHitTestVisible = false,
+                Child = _musicaWebView
+            };
+            Canvas.SetLeft(musicaContainer, 0);
+            Canvas.SetTop(musicaContainer, 0);
+            BrowserContainer.Children.Add(musicaContainer);
+
+            await _musicaWebView.EnsureCoreWebView2Async(_env);
+            // Permitir acceso a archivos locales en el WebView de música
+            _musicaWebView.CoreWebView2.Settings.AreDefaultScriptDialogsEnabled = false;
+            // Mapear todas las unidades disponibles
+            foreach (var drive in System.IO.DriveInfo.GetDrives())
+            {
+                if (!drive.IsReady) continue;
+                string letra = drive.Name[0].ToString().ToLower(); // "c", "d", etc.
+                try
+                {
+                    _musicaWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                        $"atsuki-drive-{letra}",
+                        drive.RootDirectory.FullName,
+                        CoreWebView2HostResourceAccessKind.Allow
+                    );
+                }
+                catch { }
+            }
+
+            _musicaWebView.CoreWebView2.WebMessageReceived += (s, args) =>
+            {
+                string msg = args.TryGetWebMessageAsString();
+                if (msg.StartsWith("musica:notify:"))
+                {
+                    string payload = msg.Substring("musica:notify:".Length);
+                    int sep = payload.LastIndexOf('|');
+                    string titulo = sep >= 0 ? payload.Substring(0, sep) : payload;
+                    string imagen = sep >= 0 ? payload.Substring(sep + 1) : "";
+                    Dispatcher.Invoke(() => MostrarNotificacionMusica(titulo, imagen));
+                }
+                else if (msg.StartsWith("musica:estado:"))
+                {
+                    string estado = msg.Substring("musica:estado:".Length);
+                    Dispatcher.Invoke(() =>
+                    {
+                        try
+                        {
+                            var json = System.Text.Json.JsonDocument.Parse(estado).RootElement;
+                            ActualizarUIMusica(json);
+                        }
+                        catch { }
+                        foreach (var tab in _tabs)
+                            tab.CoreWebView2?.PostWebMessageAsString("atsukimusic:estado:" + estado);
+
+                        // Arranque inicial — reproducir aleatoria una sola vez cuando el player ya confirmó su estado
+                        if (_musicaArranqueInicial)
+                        {
+                            _musicaArranqueInicial = false;
+                            var todasLasCanciones = _playlists
+                                .SelectMany((pl, pi) => pl.canciones.Select((_, ci) => (pi, ci)))
+                                .ToList();
+
+                            if (todasLasCanciones.Count > 0)
+                            {
+                                var rng = new Random();
+                                var (playlistIdx, cancionIdx) = todasLasCanciones[rng.Next(todasLasCanciones.Count)];
+                                _musicaWebView.CoreWebView2?.PostWebMessageAsString("player:switchplaylist:" + playlistIdx);
+
+                                // Usar DispatcherTimer para que el mensaje llegue desde el hilo UI
+                                var arranqueTimer = new System.Windows.Threading.DispatcherTimer
+                                {
+                                    Interval = TimeSpan.FromMilliseconds(300)
+                                };
+                                arranqueTimer.Tick += (t, _) =>
+                                {
+                                    arranqueTimer.Stop();
+                                    _musicaWebView.CoreWebView2?.PostWebMessageAsString("player:reproducir:" + cancionIdx);
+                                };
+                                arranqueTimer.Start();
+                            }
+                        }
+                    });
+                }
+            };
+
+
+            _musicaWebView.NavigationCompleted += (s2, e2) =>
+            {
+                if (!e2.IsSuccess) return;
+                EnviarPlaylistsAlPlayer();
+
+                // Aplicar volumen guardado
+                string volPath = Path.Combine(_carpetaPerfil, "musica_volumen.txt");
+                if (File.Exists(volPath) &&
+                    double.TryParse(File.ReadAllText(volPath).Trim(),
+                        System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        out double vol))
+                {
+                    MusicaVolumen.Value = Math.Clamp(vol, 0.0, 1.0);
+                    _musicaWebView.CoreWebView2?.PostWebMessageAsString(
+                        "player:volumen:" + vol.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+                }
+            };
+
+            string htmlPath = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory,
+                "Resources", "player.html");
+            _musicaWebView.Source = new Uri("file:///" + htmlPath.Replace("\\", "/"));
+        }
+
+        private void MostrarNotificacionMusica(string titulo, string imagenUrl = "")
+        {
+            // Cerrar toast anterior si existe
+            _musicaToast?.Close();
+
+            var toast = new Window
+            {
+                Width = 280, Height = 70,
+                WindowStyle = WindowStyle.None,
+                ResizeMode = ResizeMode.NoResize,
+                AllowsTransparency = true,
+                Background = Brushes.Transparent,
+                Topmost = true,
+                ShowInTaskbar = false,
+                WindowStartupLocation = WindowStartupLocation.Manual
+            };
+
+            var screen = SystemParameters.WorkArea;
+            toast.Left = screen.Right - 292;
+            toast.Top  = screen.Bottom - 82;
+
+            var border = new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(230, 13, 13, 22)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(180, 124, 58, 237)),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(10, 8, 14, 8),
+                Effect = new System.Windows.Media.Effects.DropShadowEffect
+                {
+                    Color = Color.FromRgb(124, 58, 237),
+                    BlurRadius = 12,
+                    ShadowDepth = 0,
+                    Opacity = 0.4
+                }
+            };
+
+            var panelH = new StackPanel { Orientation = Orientation.Horizontal };
+
+            if (!string.IsNullOrEmpty(imagenUrl))
+            {
+                try
+                {
+                    var img = new System.Windows.Controls.Image
+                    {
+                        Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(imagenUrl)),
+                        Width = 36, Height = 36,
+                        Stretch = System.Windows.Media.Stretch.UniformToFill,
+                        Margin = new Thickness(0, 0, 8, 0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Clip = new System.Windows.Media.RectangleGeometry
+                            { Rect = new Rect(0, 0, 36, 36), RadiusX = 4, RadiusY = 4 }
+                    };
+                    panelH.Children.Add(img);
+                }
+                catch { }
+            }
+            else
+            {
+                panelH.Children.Add(new TextBlock
+                {
+                    Text = "🎵",
+                    FontSize = 20,
+                    Margin = new Thickness(0, 0, 8, 0),
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+            }
+
+            var textos = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+            textos.Children.Add(new TextBlock
+            {
+                Text = "Reproduciendo",
+                FontSize = 9,
+                Foreground = new SolidColorBrush(Color.FromArgb(180, 124, 58, 237))
+            });
+            textos.Children.Add(new TextBlock
+            {
+                Text = titulo,
+                FontSize = 12,
+                Foreground = Brushes.White,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 190
+            });
+            panelH.Children.Add(textos);
+            border.Child = panelH;
+            toast.Content = border;
+
+            _musicaToast = toast;
+            toast.Show();
+
+            // Auto-cerrar después de 4 segundos
+            var timer = new System.Timers.Timer(4000);
+            timer.Elapsed += (s, e) =>
+            {
+                timer.Stop();
+                Dispatcher.Invoke(() => { toast.Close(); });
+            };
+            timer.Start();
+        }
+
+        private void InicializarControlsMusica()
+        {
+            BtnMusicaPlay.Click += (s, e) =>
+                _musicaWebView?.CoreWebView2?.PostWebMessageAsString(
+                    _musicaReproduciendo ? "player:pause" : "player:play");
+
+            BtnMusicaAnterior.Click += (s, e) =>
+                _musicaWebView?.CoreWebView2?.PostWebMessageAsString("player:anterior");
+
+            BtnMusicaSiguiente.Click += (s, e) =>
+                _musicaWebView?.CoreWebView2?.PostWebMessageAsString("player:siguiente");
+
+            // ── NUEVO: Botón aleatorio ──
+            BtnMusicaAleatorio.Click += (s, e) =>
+                _musicaWebView?.CoreWebView2?.PostWebMessageAsString("player:aleatorio");
+
+            BtnMusicaShuffle.Click += (s, e) =>
+            {
+                bool shuffle = BtnMusicaShuffle.Foreground is SolidColorBrush b &&
+                            b.Color == Color.FromRgb(85, 85, 119);
+                BtnMusicaShuffle.Foreground = shuffle
+                    ? new SolidColorBrush(Color.FromRgb(124, 58, 237))
+                    : new SolidColorBrush(Color.FromArgb(180, 85, 85, 119));
+                _musicaWebView?.CoreWebView2?.PostWebMessageAsString(
+                    "player:shuffle:" + shuffle.ToString().ToLower());
+            };
+
+            BtnMusicaRepeat.Click += (s, e) =>
+            {
+                string[] modos = { "none", "all", "one" };
+                string actual = BtnMusicaRepeat.Tag as string ?? "none";
+                string siguiente = modos[(Array.IndexOf(modos, actual) + 1) % modos.Length];
+                BtnMusicaRepeat.Tag = siguiente;
+                BtnMusicaRepeat.Content = siguiente == "one" ? "↻¹" : "↻";
+                BtnMusicaRepeat.Foreground = siguiente != "none"
+                    ? new SolidColorBrush(Color.FromRgb(124, 58, 237))
+                    : new SolidColorBrush(Color.FromArgb(180, 85, 85, 119));
+                _musicaWebView?.CoreWebView2?.PostWebMessageAsString("player:repeat:" + siguiente);
+            };
+
+            MusicaVolumen.ValueChanged += (s, e) =>
+            {
+                double vol = MusicaVolumen.Value;
+                _musicaWebView?.CoreWebView2?.PostWebMessageAsString(
+                    "player:volumen:" + vol.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+                // Guardar volumen
+                File.WriteAllText(Path.Combine(_carpetaPerfil, "musica_volumen.txt"),
+                    vol.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+            };
+
+            MusicaProgreso.ValueChanged += (s, e) =>
+            {
+                if (MusicaProgreso.IsMouseOver)
+                    _musicaWebView?.CoreWebView2?.PostWebMessageAsString(
+                        "player:seek:" + MusicaProgreso.Value.ToString("F2",
+                            System.Globalization.CultureInfo.InvariantCulture));
+            };
+
+            // ── NUEVO: Crear playlist ──
+            BtnMusicaNuevaPlaylist.Click += (s, e) => CrearNuevaPlaylist();
+
+            // ── NUEVO: Exportar ──
+            BtnMusicaExportar.Click += (s, e) => ExportarMusica();
+
+            // ── NUEVO: Importar ──
+            BtnMusicaImportar.Click += async (s, e) => await ImportarMusica();
+
+            BtnMusicaAgregarArchivo.Click += async (s, e) =>
+            {
+                try
+                {
+                    var dialog = new Microsoft.Win32.OpenFileDialog
+                    {
+                        Title = "Agregar música",
+                        Filter = "Audio|*.mp3;*.flac;*.wav;*.ogg;*.aac;*.m4a",
+                        Multiselect = true
+                    };
+                    if (dialog.ShowDialog() != true) return;
+                    await InicializarMusicaWebView();
+                    foreach (var archivo in dialog.FileNames)
+                    {
+                        string nombre = Path.GetFileNameWithoutExtension(archivo);
+                        string letra = Path.GetPathRoot(archivo)![0].ToString().ToLower();
+                        string rutaRelativa = archivo.Substring(3).Replace("\\", "/");
+                        string url = $"https://atsuki-drive-{letra}/{rutaRelativa}";
+                        _playlists[_playlistActiva].canciones.Add(new MusicaCancion
+                        {
+                            titulo = nombre,
+                            autor  = "",
+                            imagen = "",
+                            url    = url
+                        });
+                    }
+                    EnviarPlaylistsAlPlayer();
+                    GuardarMusicaPlaylist();
+                    RenderizarMusicaUI();
+                }
+                catch (Exception ex) { MessageBox.Show("Error: " + ex.Message); }
+            };
+
+            BtnMusicaAddStream.Click += (s, e) => AgregarMusicaStream();
+            MusicaStreamInput.KeyDown += (s, e) => { if (e.Key == Key.Enter) AgregarMusicaStream(); };
+
+            BtnMusicaLimpiar.Click += (s, e) =>
+            {
+                _playlists[_playlistActiva].canciones.Clear();
+                EnviarPlaylistsAlPlayer();
+                GuardarMusicaPlaylist();
+                RenderizarMusicaUI();
+            };
+
+            // Cargar volumen guardado
+            string volPath = Path.Combine(_carpetaPerfil, "musica_volumen.txt");
+            if (File.Exists(volPath) &&
+                double.TryParse(File.ReadAllText(volPath).Trim(),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out double volGuardado))
+            {
+                MusicaVolumen.Value = Math.Clamp(volGuardado, 0.0, 1.0);
+            }
+
+            if (_playlists == null || _playlists.Count == 0)
+                _playlists = new() { new MusicaPlaylist() };
+            CargarMusicaPlaylist();
+            if (_playlists.Count == 0)
+                _playlists.Add(new MusicaPlaylist());
+            _playlistActiva = 0;
+            RenderizarMusicaUI();
+        }
+
+        private void AgregarMusicaStream()
+        {
+            string url = MusicaStreamInput.Text.Trim();
+            if (string.IsNullOrEmpty(url)) return;
+            string nombre = url.Split('/').LastOrDefault() ?? url;
+            _playlists[_playlistActiva].canciones.Add(new MusicaCancion { titulo = nombre, url = url });
+            MusicaStreamInput.Text = "";
+            var json = System.Text.Json.JsonSerializer.Serialize(
+                _playlists[_playlistActiva].canciones.Select(p => new { titulo = p.titulo, url = p.url }));
+            _musicaWebView?.CoreWebView2?.PostWebMessageAsString("player:playlist:" + json);
+            GuardarMusicaPlaylist();
+            RenderizarMusicaUI();
+        }
+
+        private void RenderizarMusicaUI()
+        {
+            // Guard: garantizar que siempre hay al menos una playlist válida
+            if (_playlists == null || _playlists.Count == 0)
+                _playlists = new() { new MusicaPlaylist() };
+            if (_playlistActiva < 0 || _playlistActiva >= _playlists.Count)
+                _playlistActiva = 0;
+            // ── Tabs de playlists ──
+            MusicaPlaylistTabs.Children.Clear();
+            for (int i = 0; i < _playlists.Count; i++)
+            {
+                int idx = i;
+                var pl = _playlists[i];
+                var tab = new Border
+                {
+                    Padding = new Thickness(10, 4, 10, 4),
+                    Margin = new Thickness(0, 0, 4, 0),
+                    CornerRadius = new CornerRadius(4),
+                    Cursor = Cursors.Hand,
+                    Background = i == _playlistActiva
+                        ? new SolidColorBrush(Color.FromRgb(124, 58, 237))
+                        : new SolidColorBrush(Color.FromArgb(30, 255, 255, 255))
+                };
+
+                var tabGrid = new Grid();
+                tabGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                tabGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var itemPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+                // Miniatura si tiene imagen
+                if (!string.IsNullOrEmpty(pl.imagen))
+                {
+                    try
+                    {
+                        var thumb = new System.Windows.Controls.Image
+                        {
+                            Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(pl.imagen)),
+                            Width = 28, Height = 28,
+                            Stretch = System.Windows.Media.Stretch.UniformToFill,
+                            Margin = new Thickness(0, 0, 6, 0),
+                            Clip = new System.Windows.Media.RectangleGeometry
+                                { Rect = new Rect(0, 0, 28, 28), RadiusX = 3, RadiusY = 3 }
+                        };
+                        itemPanel.Children.Add(thumb);
+                    }
+                    catch { }
+                }
+
+                var textoStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+                textoStack.Children.Add(new TextBlock
+                {
+                    Text = string.IsNullOrEmpty(pl.nombre) ? "(sin nombre)" : pl.nombre,
+                    FontSize = 11,
+                    Foreground = Brushes.White,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 180
+                });
+                itemPanel.Children.Add(textoStack);
+                Grid.SetColumn(itemPanel, 0);
+                tabGrid.Children.Add(itemPanel);
+
+                // Botón eliminar playlist (no la primera)
+                if (i > 0)
+                {
+                    var btnX = new Button
+                    {
+                        Content = "×", FontSize = 11,
+                        Background = Brushes.Transparent,
+                        BorderThickness = new Thickness(0),
+                        Foreground = new SolidColorBrush(Color.FromArgb(160, 255, 255, 255)),
+                        Cursor = Cursors.Hand,
+                        Padding = new Thickness(4, 0, 0, 0),
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    btnX.Click += (s, e) =>
+                    {
+                        e.Handled = true;
+                        if (_playlists.Count <= 1) return;
+                        _playlists.RemoveAt(idx);
+                        if (_playlistActiva >= _playlists.Count) _playlistActiva = _playlists.Count - 1;
+                        EnviarPlaylistsAlPlayer();
+                        GuardarMusicaPlaylist();
+                        RenderizarMusicaUI();
+                    };
+                    Grid.SetColumn(btnX, 1);
+                    tabGrid.Children.Add(btnX);
+                }
+
+                tab.Child = tabGrid;
+                tab.MouseLeftButtonDown += (s, e) =>
+                {
+                    _playlistActiva = idx;
+                    _musicaWebView?.CoreWebView2?.PostWebMessageAsString("player:switchplaylist:" + idx);
+                    RenderizarMusicaUI();
+                };
+
+                // Click derecho → cambiar imagen
+                tab.MouseRightButtonDown += (s, e) =>
+                {
+                    var dlg = new Microsoft.Win32.OpenFileDialog
+                    {
+                        Filter = "Imágenes|*.png;*.jpg;*.jpeg;*.webp;*.gif",
+                        Title = "Imagen para \"" + pl.nombre + "\""
+                    };
+                    if (dlg.ShowDialog() != true) return;
+                    _playlists[idx].imagen = "file:///" + dlg.FileName.Replace("\\", "/");
+                    GuardarMusicaPlaylist();
+                    EnviarPlaylistsAlPlayer();
+                };
+
+                MusicaPlaylistTabs.Children.Add(tab);
+            }
+
+            // ── Imagen de playlist activa ──
+            string img = _playlists[_playlistActiva].imagen;
+            if (!string.IsNullOrEmpty(img))
+            {
+                try
+                {
+                    MusicaPlaylistImagen.Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(img));
+                    MusicaPlaylistImagen.Visibility = Visibility.Visible;
+                }
+                catch { MusicaPlaylistImagen.Visibility = Visibility.Collapsed; }
+            }
+            else
+            {
+                MusicaPlaylistImagen.Visibility = Visibility.Collapsed;
+            }
+
+            // ── Lista de canciones ──
+            MusicaPlaylist.Children.Clear();
+            var canciones = _playlists[_playlistActiva].canciones;
+            if (canciones.Count == 0)
+            {
+                MusicaPlaylist.Children.Add(new TextBlock
+                {
+                    Text = "Agrega canciones o streams",
+                    FontSize = 11,
+                    Foreground = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255)),
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    Margin = new Thickness(0, 12, 0, 0)
+                });
+                return;
+            }
+
+            for (int i = 0; i < canciones.Count; i++)
+            {
+                int idx = i;
+                var item = canciones[i];
+                var border = new Border
+                {
+                    Margin = new Thickness(0, 2, 0, 2),
+                    Cursor = Cursors.Hand,
+                    Background = i == _musicaIndiceActivo
+                        ? new SolidColorBrush(Color.FromArgb(40, 124, 58, 237))
+                        : new SolidColorBrush(Color.FromArgb(20, 255, 255, 255)),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6, 4, 6, 4)
+                };
+                var grid = new Grid();
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var itemPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+                if (!string.IsNullOrEmpty(item.imagen))
+                {
+                    try
+                    {
+                        var thumb = new System.Windows.Controls.Image
+                        {
+                            Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(item.imagen)),
+                            Width = 28, Height = 28,
+                            Stretch = System.Windows.Media.Stretch.UniformToFill,
+                            Margin = new Thickness(0, 0, 6, 0),
+                            Clip = new System.Windows.Media.RectangleGeometry
+                                { Rect = new Rect(0, 0, 28, 28), RadiusX = 3, RadiusY = 3 }
+                        };
+                        itemPanel.Children.Add(thumb);
+                    }
+                    catch { }
+                }
+                var textoStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+                textoStack.Children.Add(new TextBlock
+                {
+                    Text = string.IsNullOrEmpty(item.titulo) ? "(sin título)" : item.titulo,
+                    FontSize = 11,
+                    Foreground = Brushes.White,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    MaxWidth = 180
+                });
+                if (!string.IsNullOrEmpty(item.autor))
+                    textoStack.Children.Add(new TextBlock
+                    {
+                        Text = item.autor,
+                        FontSize = 9,
+                        Foreground = new SolidColorBrush(Color.FromArgb(150, 200, 180, 255)),
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                        MaxWidth = 180
+                    });
+                itemPanel.Children.Add(textoStack);
+                grid.Children.Add(itemPanel);
+
+                var btnDel = new Button
+                {
+                    Content = "×", FontSize = 12,
+                    Background = Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    Foreground = new SolidColorBrush(Color.FromArgb(120, 255, 255, 255)),
+                    Cursor = Cursors.Hand,
+                    Padding = new Thickness(4, 2, 4, 2)
+                };
+                btnDel.Click += (s, e) =>
+                {
+                    _playlists[_playlistActiva].canciones.RemoveAt(idx);
+                    EnviarPlaylistsAlPlayer();
+                    GuardarMusicaPlaylist();
+                    RenderizarMusicaUI();
+                };
+                Grid.SetColumn(btnDel, 1);
+                grid.Children.Add(btnDel);
+                border.Child = grid;
+
+                border.MouseLeftButtonDown += async (s, e) =>
+                {
+                    if (e.OriginalSource is Button) return;
+                    await InicializarMusicaWebView();
+                    EnviarPlaylistsAlPlayer();
+                    await Task.Delay(200);
+                    _musicaWebView?.CoreWebView2?.PostWebMessageAsString("player:reproducir:" + idx);
+                };
+
+                border.MouseRightButtonDown += (s, e) => EditarMetadatosCancion(idx);
+                MusicaPlaylist.Children.Add(border);
+            }
+        }
+
+        private void ActualizarUIMusica(System.Text.Json.JsonElement estado)
+        {
+            _musicaReproduciendo = estado.TryGetProperty("reproduciendo", out var rep) && rep.GetBoolean();
+            _musicaIndiceActivo  = estado.TryGetProperty("indice", out var idx) ? idx.GetInt32() : -1;
+
+            BtnMusicaPlay.Content = _musicaReproduciendo ? "⏸" : "▶";
+
+            if (estado.TryGetProperty("titulo", out var titulo))
+                MusicaTitulo.Text = titulo.GetString() is { Length: > 0 } t ? t : "Sin reproducción";
+
+            if (estado.TryGetProperty("progreso", out var prog) &&
+                estado.TryGetProperty("duracion", out var dur))
+            {
+                double durVal = dur.GetDouble();
+                MusicaProgreso.Maximum = durVal > 0 ? durVal : 1;
+                if (!MusicaProgreso.IsMouseOver)
+                    MusicaProgreso.Value = prog.GetDouble();
+
+                string fmt(double s) => $"{(int)(s / 60)}:{((int)(s % 60)):D2}";
+                MusicaInfo.Text = durVal > 0
+                    ? $"{fmt(prog.GetDouble())} / {fmt(durVal)}"
+                    : "—";
+            }
+        }
+
+        private string NormalizarUrlMusica(string url)
+        {
+            if (url.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+            {
+                string path = url.Substring(8);
+                if (path.Length >= 2 && path[1] == ':')
+                {
+                    string letra = path[0].ToString().ToLower();
+                    string resto = path.Substring(3).Replace("\\", "/");
+                    return $"https://atsuki-drive-{letra}/{resto}";
+                }
+            }
+            return url;
+        }
+
+        private void GuardarMusicaPlaylist()
+        {
+            string path = Path.Combine(_carpetaPerfil, "musica_playlists.json");
+            File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(_playlists));
+        }
+
+        private void CargarMusicaPlaylist()
+        {
+            // Migrar archivo viejo si existe
+            string pathViejo = Path.Combine(_carpetaPerfil, "musica_playlist.json");
+            string path = Path.Combine(_carpetaPerfil, "musica_playlists.json");
+
+            if (!File.Exists(path) && File.Exists(pathViejo))
+            {
+                // Migración: envolver playlist vieja en estructura nueva
+                try
+                {
+                    var items = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(File.ReadAllText(pathViejo));
+                    if (items != null)
+                        foreach (var item in items)
+                        {
+                            string t = item.GetProperty("titulo").GetString() ?? "";
+                            string u = item.GetProperty("url").GetString() ?? "";
+                            if (!string.IsNullOrEmpty(u))
+                                _playlists[0].canciones.Add(new MusicaCancion { titulo = t, url = NormalizarUrlMusica(u) });
+                        }
+                }
+                catch { }
+                return;
+            }
+
+            if (!File.Exists(path)) return;
+            try
+            {
+                var raw = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(File.ReadAllText(path));
+                if (raw == null) return;
+                _playlists.Clear();
+                foreach (var p in raw)
+                {
+                    var pl = new MusicaPlaylist
+                    {
+                        nombre = p.TryGetProperty("nombre", out var n) ? n.GetString() ?? "Playlist" : "Playlist",
+                        imagen = p.TryGetProperty("imagen", out var img) ? img.GetString() ?? "" : ""
+                    };
+                    if (p.TryGetProperty("canciones", out var canciones))
+                        foreach (var c in canciones.EnumerateArray())
+                        {
+                            string t  = c.TryGetProperty("titulo",  out var tt) ? tt.GetString() ?? "" : "";
+                            string au = c.TryGetProperty("autor",   out var aa) ? aa.GetString() ?? "" : "";
+                            string im = c.TryGetProperty("imagen",  out var ii) ? ii.GetString() ?? "" : "";
+                            string u  = c.TryGetProperty("url",     out var uu) ? uu.GetString() ?? "" : "";
+                            if (!string.IsNullOrEmpty(u))
+                                pl.canciones.Add(new MusicaCancion
+                                    { titulo = t, autor = au, imagen = im, url = NormalizarUrlMusica(u) });
+                        }
+                    _playlists.Add(pl);
+                }
+                if (_playlists.Count == 0)
+                    _playlists.Add(new MusicaPlaylist());
+            }
+            catch { _playlists = new() { new MusicaPlaylist() }; }
+            // Migrar URLs viejas al nuevo formato
+            foreach (var pl in _playlists)
+            {
+                foreach (var c in pl.canciones)
+                {
+                    string urlNorm = NormalizarUrlMusica(c.url);
+                    if (c.url.StartsWith("https://atsuki-music/"))
+                        urlNorm = $"https://atsuki-drive-c/{c.url.Substring("https://atsuki-music/".Length)}";
+                    if (urlNorm != c.url) c.url = urlNorm;
+                }
+            }
+        }
+
+        private void EnviarPlaylistsAlPlayer()
+        {
+            if (_musicaWebView?.CoreWebView2 == null) return;
+            string json = System.Text.Json.JsonSerializer.Serialize(_playlists);
+            _musicaWebView.CoreWebView2.PostWebMessageAsString("player:playlists:" + json);
+        }
+
+        private void CrearNuevaPlaylist()
+        {
+            var win = new Window
+            {
+                Title = "Nueva playlist",
+                Width = 340, Height = 200,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize,
+                Background = new SolidColorBrush(Color.FromRgb(13, 13, 26)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(80, 124, 58, 237)),
+                BorderThickness = new Thickness(1)
+            };
+            var stack = new StackPanel { Margin = new Thickness(20) };
+            stack.Children.Add(new TextBlock
+            {
+                Text = "Nombre de la playlist",
+                Foreground = Brushes.White,
+                FontSize = 13,
+                Margin = new Thickness(0, 0, 0, 8)
+            });
+            var txt = new TextBox
+            {
+                Text = "Mi playlist",
+                Background = new SolidColorBrush(Color.FromRgb(26, 26, 46)),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromArgb(80, 124, 58, 237)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(6),
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+            stack.Children.Add(txt);
+
+            string imagenElegida = "";
+            var btnImg = new Button
+            {
+                Content = "🖼 Elegir imagen (opcional)",
+                Background = new SolidColorBrush(Color.FromRgb(30, 30, 46)),
+                Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 200)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(61, 42, 110)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8, 4, 8, 4),
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 0, 0, 12)
+            };
+            btnImg.Click += (s, e) =>
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog
+                {
+                    Filter = "Imágenes|*.png;*.jpg;*.jpeg;*.webp;*.gif",
+                    Title = "Imagen para la playlist"
+                };
+                if (dlg.ShowDialog() != true) return;
+                imagenElegida = "file:///" + dlg.FileName.Replace("\\", "/");
+                btnImg.Content = "✅ " + Path.GetFileName(dlg.FileName);
+            };
+            stack.Children.Add(btnImg);
+
+            var btnOk = new Button
+            {
+                Content = "Crear",
+                Background = new SolidColorBrush(Color.FromRgb(124, 58, 237)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(16, 6, 16, 6),
+                Cursor = Cursors.Hand,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            btnOk.Click += (s, e) =>
+            {
+                _playlists.Add(new MusicaPlaylist
+                {
+                    nombre = string.IsNullOrWhiteSpace(txt.Text) ? "Playlist" : txt.Text.Trim(),
+                    imagen = imagenElegida
+                });
+                GuardarMusicaPlaylist();
+                RenderizarMusicaUI();
+                win.Close();
+            };
+            stack.Children.Add(btnOk);
+            win.Content = stack;
+            win.ShowDialog();
+        }
+
+        private void ExportarMusica()
+        {
+            var dlg = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Exportar playlists",
+                Filter = "JSON|*.json",
+                FileName = "atsuki_musica_backup"
+            };
+            if (dlg.ShowDialog() != true) return;
+            try
+            {
+                var data = _playlists.Select(p => new
+                {
+                    nombre = p.nombre,
+                    imagen = p.imagen,
+                    canciones = p.canciones.Select(c => new { titulo = c.titulo, url = c.url })
+                });
+                File.WriteAllText(dlg.FileName,
+                    System.Text.Json.JsonSerializer.Serialize(data,
+                        new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                MessageBox.Show("✅ Exportación completada.", "Listo",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex) { MessageBox.Show("Error al exportar: " + ex.Message); }
+        }
+
+        private async Task ImportarMusica()
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog
+            {
+                Title = "Importar playlists",
+                Filter = "JSON|*.json"
+            };
+            if (dlg.ShowDialog() != true) return;
+            try
+            {
+                var raw = System.Text.Json.JsonSerializer.Deserialize<List<System.Text.Json.JsonElement>>(
+                    File.ReadAllText(dlg.FileName));
+                if (raw == null) return;
+
+                var resultado = MessageBox.Show(
+                    "¿Reemplazar todo o añadir a las playlists existentes?\n\nSí = Reemplazar  |  No = Añadir",
+                    "Importar", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                if (resultado == MessageBoxResult.Cancel) return;
+                if (resultado == MessageBoxResult.Yes) _playlists.Clear();
+
+                foreach (var p in raw)
+                {
+                    var pl = new MusicaPlaylist
+                    {
+                        nombre = p.TryGetProperty("nombre", out var n) ? n.GetString() ?? "Playlist" : "Playlist",
+                        imagen = p.TryGetProperty("imagen", out var img) ? img.GetString() ?? "" : ""
+                    };
+                    if (p.TryGetProperty("canciones", out var canciones))
+                        foreach (var c in canciones.EnumerateArray())
+                        {
+                            string t = c.TryGetProperty("titulo", out var tt) ? tt.GetString() ?? "" : "";
+                            string u = c.TryGetProperty("url", out var uu) ? uu.GetString() ?? "" : "";
+                            if (!string.IsNullOrEmpty(u)) pl.canciones.Add(new MusicaCancion { titulo = t, url = NormalizarUrlMusica(u) });
+                        }
+                    _playlists.Add(pl);
+                }
+                if (_playlists.Count == 0) _playlists.Add(new MusicaPlaylist());
+
+                await InicializarMusicaWebView();
+                EnviarPlaylistsAlPlayer();
+                GuardarMusicaPlaylist();
+                RenderizarMusicaUI();
+                MessageBox.Show("✅ Importación completada.", "Listo",
+                    MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex) { MessageBox.Show("Error al importar: " + ex.Message); }
+        }
+
+        private void EditarMetadatosCancion(int idx)
+        {
+            var cancion = _playlists[_playlistActiva].canciones[idx];
+
+            var win = new Window
+            {
+                Title = "Editar canción",
+                Width = 360, Height = 300,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ResizeMode = ResizeMode.NoResize,
+                Background = new SolidColorBrush(Color.FromRgb(13, 13, 26)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(80, 124, 58, 237)),
+                BorderThickness = new Thickness(1)
+            };
+
+            var stack = new StackPanel { Margin = new Thickness(20) };
+
+            // Título
+            stack.Children.Add(new TextBlock { Text = "Título", Foreground = new SolidColorBrush(Color.FromArgb(160, 255, 255, 255)), FontSize = 11, Margin = new Thickness(0, 0, 0, 4) });
+            var txtTitulo = new TextBox
+            {
+                Text = cancion.titulo,
+                Background = new SolidColorBrush(Color.FromRgb(20, 20, 36)),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(61, 42, 110)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8, 5, 8, 5),
+                Margin = new Thickness(0, 0, 0, 10),
+                CaretBrush = new SolidColorBrush(Color.FromRgb(124, 58, 237))
+            };
+            stack.Children.Add(txtTitulo);
+
+            // Autor
+            stack.Children.Add(new TextBlock { Text = "Autor", Foreground = new SolidColorBrush(Color.FromArgb(160, 255, 255, 255)), FontSize = 11, Margin = new Thickness(0, 0, 0, 4) });
+            var txtAutor = new TextBox
+            {
+                Text = cancion.autor,
+                Background = new SolidColorBrush(Color.FromRgb(20, 20, 36)),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(61, 42, 110)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8, 5, 8, 5),
+                Margin = new Thickness(0, 0, 0, 10),
+                CaretBrush = new SolidColorBrush(Color.FromRgb(124, 58, 237))
+            };
+            stack.Children.Add(txtAutor);
+
+            // Imagen
+            string imagenElegida = cancion.imagen;
+            var btnImg = new Button
+            {
+                Content = string.IsNullOrEmpty(imagenElegida) ? "🖼 Elegir imagen" : "✅ " + Path.GetFileName(imagenElegida.Replace("file:///", "")),
+                Background = new SolidColorBrush(Color.FromRgb(30, 30, 46)),
+                Foreground = new SolidColorBrush(Color.FromRgb(150, 150, 200)),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(61, 42, 110)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8, 4, 8, 4),
+                Cursor = Cursors.Hand,
+                Margin = new Thickness(0, 0, 0, 16)
+            };
+            btnImg.Click += (s, e) =>
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog
+                {
+                    Filter = "Imágenes|*.png;*.jpg;*.jpeg;*.webp;*.gif",
+                    Title = "Imagen para la canción"
+                };
+                if (dlg.ShowDialog() != true) return;
+                imagenElegida = "file:///" + dlg.FileName.Replace("\\", "/");
+                btnImg.Content = "✅ " + Path.GetFileName(dlg.FileName);
+            };
+            stack.Children.Add(btnImg);
+
+            // Botón guardar
+            var btnOk = new Button
+            {
+                Content = "Guardar",
+                Background = new SolidColorBrush(Color.FromRgb(124, 58, 237)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                Padding = new Thickness(16, 6, 16, 6),
+                Cursor = Cursors.Hand,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            btnOk.Click += (s, e) =>
+            {
+                cancion.titulo = txtTitulo.Text.Trim();
+                cancion.autor  = txtAutor.Text.Trim();
+                cancion.imagen = imagenElegida;
+                GuardarMusicaPlaylist();
+                EnviarPlaylistsAlPlayer();
+                RenderizarMusicaUI();
+                win.Close();
+            };
+            stack.Children.Add(btnOk);
+            win.Content = stack;
+            win.ShowDialog();
         }
     }
 
@@ -4493,5 +6187,58 @@ namespace atsukibrowser
 
             Content = root;
         }
+    }
+    public class SugerenciaItem
+    {
+        public string Icono { get; set; } = "";
+        public string Titulo { get; set; } = "";
+        public string Subtitulo { get; set; } = "";
+        public string Url { get; set; } = "";
+        public string FaviconUrl { get; set; } = "";
+    }
+    public class StringToVisibilityConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            => string.IsNullOrEmpty(value as string) ? Visibility.Collapsed : Visibility.Visible;
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+
+    public class UrlToImageConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+        {
+            if (string.IsNullOrEmpty(value as string)) 
+                return System.Windows.DependencyProperty.UnsetValue;
+            try
+            {
+                var bmp = new System.Windows.Media.Imaging.BitmapImage();
+                bmp.BeginInit();
+                bmp.UriSource = new Uri(value as string);
+                bmp.DecodePixelWidth = 16;
+                bmp.CreateOptions = System.Windows.Media.Imaging.BitmapCreateOptions.None;
+                bmp.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnDemand;
+                bmp.EndInit();
+                bmp.Freeze();
+                return bmp;
+            }
+            catch { return System.Windows.DependencyProperty.UnsetValue; }
+        }
+        public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
+            => throw new NotImplementedException();
+    }
+    public class MusicaCancion
+    {
+        public string titulo  { get; set; } = "";
+        public string autor   { get; set; } = "";
+        public string imagen  { get; set; } = "";
+        public string url     { get; set; } = "";
+    }
+
+    public class MusicaPlaylist
+    {
+        public string nombre  { get; set; } = "Nueva playlist";
+        public string imagen  { get; set; } = "";
+        public List<MusicaCancion> canciones { get; set; } = new();
     }
 }

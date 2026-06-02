@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        xmlns:local="clr-namespace:atsukibrowser"
         Title="AtsukiBrowser" Height="720" Width="1280"
         Icon="icon.ico"
         MinHeight="500" MinWidth="800"
@@ -37,6 +38,7 @@
             </Setter.Value>
         </Setter>
     </Style>
+    <local:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
 </Window.Resources>
 
 <WindowChrome.WindowChrome>
@@ -54,13 +56,26 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="52"/>
+            <ColumnDefinition x:Name="SidebarColumn" Width="52"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
+        <!-- Marca de agua preview -->
+        <TextBlock x:Name="MarcaAgua"
+                Grid.Row="0" Grid.Column="0"
+                Grid.ColumnSpan="2"
+                Text="Estás en una preview — esta versión puede ser inestable"
+                Foreground="#44ffffff"
+                FontSize="10"
+                FontFamily="Segoe UI"
+                VerticalAlignment="Center"
+                HorizontalAlignment="Center"
+                IsHitTestVisible="False"
+                Panel.ZIndex="1"
+                Visibility="Collapsed"/>
 
         <!-- Barra de pestañas (ocupa columnas 0 y 1) -->
         <Grid x:Name="TabBar" Grid.Row="0" Grid.ColumnSpan="2" 
-            Background="#0A0A10">
+            Background="#0A0A10" Height="38">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -68,7 +83,7 @@
 
             <!-- Pestañas + botón nueva pestaña -->
             <Border x:Name="TabBarBorder" Grid.Column="0" BorderBrush="#1a1030" BorderThickness="0,0,0,1">
-                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Hidden">
+                <ScrollViewer x:Name="TabScrollViewer" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Hidden">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
                         <StackPanel x:Name="TabStrip" Orientation="Horizontal" VerticalAlignment="Bottom"/>
                         <Button x:Name="BtnNewTab" Content="+"
@@ -83,7 +98,23 @@
             </Border>
 
             <!-- Botones de ventana estilo Chrome -->
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Top">
+            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Badge preview -->
+                <Border x:Name="BadgePreview"
+                        Background="Transparent"
+                        BorderBrush="#7c3aed"
+                        BorderThickness="1"
+                        CornerRadius="4"
+                        Padding="6,2"
+                        Margin="0,0,6,0"
+                        VerticalAlignment="Center"
+                        Visibility="Collapsed">
+                    <TextBlock Text="PREVIEW"
+                               FontSize="9"
+                               FontWeight="SemiBold"
+                               Foreground="#9d5aff"
+                               FontFamily="Segoe UI"/>
+                </Border>
                 <Button x:Name="BtnMinimize" Content="─"
                         Width="46" Height="34"
                         WindowChrome.IsHitTestVisibleInChrome="True"
@@ -164,9 +195,13 @@
                             CornerRadius="6,0,0,6"/>
 
                     <!-- Icono HTTPS — cambia según el protocolo -->
-                    <TextBlock x:Name="UrlIcono" Grid.Column="1" FontSize="11"
-                            Foreground="#444466" VerticalAlignment="Center"
-                            Margin="8,0,4,0" Text="🔒"/>
+                    <Viewbox Grid.Column="1" Width="13" Height="13" Margin="8,0,4,0">
+                        <Canvas Width="24" Height="24">
+                            <Path x:Name="UrlIconoPath"
+                                Data="M12 2a5 5 0 0 1 5 5v3H7V7a5 5 0 0 1 5-5zM7 10h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2z"
+                                Fill="#444466"/>
+                        </Canvas>
+                    </Viewbox>
 
                     <!-- TextBox editable (visible al enfocar) -->
                     <TextBox Grid.Column="2" x:Name="UrlBar"
@@ -201,7 +236,7 @@
                     <ListBox x:Name="SugerenciasList"
                             Background="Transparent"
                             BorderThickness="0"
-                            MaxHeight="280"
+                            MaxHeight="320"
                             Foreground="White"
                             FontSize="14"
                             Padding="4"
@@ -209,10 +244,11 @@
                             KeyDown="SugerenciasList_KeyDown">
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
-                                <Setter Property="Padding" Value="12,8"/>
+                                <Setter Property="Padding" Value="8,6"/>
                                 <Setter Property="Foreground" Value="#ccccee"/>
                                 <Setter Property="Background" Value="Transparent"/>
                                 <Setter Property="BorderThickness" Value="0"/>
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
                                         <Setter Property="Background" Value="#1a1a3a"/>
@@ -223,6 +259,31 @@
                                 </Style.Triggers>
                             </Style>
                         </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="32"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0"
+                                            Text="{Binding Icono}"
+                                            FontSize="14"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Titulo}"
+                                                FontSize="13"
+                                                Foreground="#e0e0f0"/>
+                                        <TextBlock Text="{Binding Subtitulo}"
+                                                FontSize="11"
+                                                Foreground="#7070a0"
+                                                Margin="0,2,0,0"
+                                                Visibility="{Binding Subtitulo, Converter={StaticResource StringToVisibilityConverter}}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
                     </ListBox>
                 </Border>
             </Popup>
@@ -230,19 +291,19 @@
             <!-- Botones derecha -->
             <StackPanel Grid.Column="2" Orientation="Horizontal"
                         Margin="4,0,8,0" VerticalAlignment="Center">
-                <Button x:Name="BtnGo" Content="🔍" Width="30" Height="30"
+                <Button x:Name="BtnGo" Width="30" Height="30"
                         Click="BtnGo_Click"
-                        Background="Transparent" Foreground="#7c3aed"
-                        BorderThickness="0" FontSize="14" Cursor="Hand"/>
-                <Button x:Name="BtnFavorito" Width="30" Height="30"
-                        Click="BtnFavorito_Click" Background="Transparent"
-                        BorderThickness="0" Cursor="Hand" ToolTip="Favorito">
+                        Background="Transparent" BorderThickness="0"
+                        Cursor="Hand">
                     <Viewbox Width="16" Height="16">
-                        <Path x:Name="PathEstrella"
-                            Data="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
-                            Stroke="#555577" StrokeThickness="1.5"
-                            StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                            Fill="Transparent"/>
+                        <Canvas Width="24" Height="24">
+                            <Path Data="M21 21l-4.35-4.35"
+                                Stroke="#7c3aed" StrokeThickness="2"
+                                StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            <Path Data="M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
+                                Stroke="#7c3aed" StrokeThickness="2"
+                                StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                        </Canvas>
                     </Viewbox>
                 </Button>
 
@@ -255,10 +316,14 @@
                                 Click="BtnZoomOut_Click"
                                 Background="Transparent" Foreground="#888899"
                                 BorderThickness="0" FontSize="16" Cursor="Hand"/>
-                        <TextBlock x:Name="ZoomLabel" Text="100%" Width="38"
+                        <TextBox x:Name="ZoomLabel" Text="100%" Width="44"
                                 Foreground="#888899" FontSize="11"
+                                Background="Transparent" BorderThickness="0"
                                 HorizontalAlignment="Center" VerticalAlignment="Center"
-                                TextAlignment="Center"/>
+                                TextAlignment="Center" Cursor="IBeam"
+                                KeyDown="ZoomLabel_KeyDown"
+                                GotFocus="ZoomLabel_GotFocus"
+                                LostFocus="ZoomLabel_LostFocus"/>
                         <Button x:Name="BtnZoomIn" Content="+" Width="24" Height="26"
                                 Click="BtnZoomIn_Click"
                                 Background="Transparent" Foreground="#888899"
@@ -272,10 +337,16 @@
                         Background="Transparent" BorderThickness="0"
                         Cursor="Hand" ToolTip="Descargas">
                     <Grid>
-                        <TextBlock Text="⬇" FontSize="15"
-                                Foreground="#555577"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"/>
+                        <Viewbox Width="16" Height="16">
+                            <Canvas Width="24" Height="24">
+                                <Path Data="M12 3v13M5 16l7 7 7-7"
+                                    Stroke="#555577" StrokeThickness="2"
+                                    StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                                <Path Data="M3 21h18"
+                                    Stroke="#555577" StrokeThickness="2"
+                                    StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                            </Canvas>
+                        </Viewbox>
                         <!-- Badge de descargas activas -->
                         <Border x:Name="BadgeDescargas"
                                 Background="#7c3aed"
@@ -328,6 +399,19 @@
                         </StackPanel>
                     </Border>
                 </Popup>
+
+                <Button x:Name="BtnFavorito" Width="30" Height="30"
+                        Click="BtnFavorito_Click"
+                        Background="Transparent" BorderThickness="0"
+                        Cursor="Hand" ToolTip="Favorito">
+                    <Viewbox Width="16" Height="16">
+                        <Path Data="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"
+                            Stroke="#555577" StrokeThickness="1.5"
+                            StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                            Fill="Transparent"
+                            x:Name="PathFavorito"/>
+                    </Viewbox>
+                </Button>
 
                 <Button x:Name="BtnAjustes" Width="30" Height="30"
                         Click="BtnAjustes_Click" Background="Transparent"
@@ -418,18 +502,182 @@
         <Border x:Name="Sidebar" Grid.Row="1" Grid.RowSpan="2" Grid.Column="0"
                 Background="#0A0A10"
                 BorderBrush="#1a1030" BorderThickness="0,0,1,0">
-            <DockPanel VerticalAlignment="Stretch">
-                <StackPanel x:Name="SidebarBottom" DockPanel.Dock="Bottom" Margin="0,0,0,8"/>
-                <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
-                    <StackPanel x:Name="SidebarTop" Margin="0,8,0,0"/>
-                </ScrollViewer>
-            </DockPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="52"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Botones del sidebar (siempre visible) -->
+                <DockPanel Grid.Column="0" VerticalAlignment="Stretch">
+                    <StackPanel x:Name="SidebarBottom" DockPanel.Dock="Bottom" Margin="0,0,0,8"/>
+                    <ScrollViewer VerticalScrollBarVisibility="Hidden" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="SidebarTop" Margin="0,8,0,0"/>
+                    </ScrollViewer>
+                </DockPanel>
+
+                <!-- Panel de música (visible cuando está expandido) -->
+                <Border x:Name="MusicaPanel" Grid.Column="1"
+                        Background="#0d0d18"
+                        BorderBrush="#1a1030" BorderThickness="1,0,0,0"
+                        Visibility="Collapsed">
+                    <DockPanel Margin="12">
+
+                        <!-- Header -->
+                        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                            <TextBlock Text="Música de fondo"
+                                    FontSize="10" FontWeight="Bold"
+                                    Foreground="#7c3aed"/>
+                        </StackPanel>
+
+                        <!-- Tabs de playlists -->
+                        <ScrollViewer DockPanel.Dock="Top"
+                                    HorizontalScrollBarVisibility="Auto"
+                                    VerticalScrollBarVisibility="Disabled"
+                                    Margin="0,0,0,6">
+                            <StackPanel x:Name="MusicaPlaylistTabs" Orientation="Horizontal"/>
+                        </ScrollViewer>
+
+                        <!-- Imagen de la playlist activa -->
+                        <Image x:Name="MusicaPlaylistImagen" DockPanel.Dock="Top"
+                            Height="70" Stretch="UniformToFill"
+                            Visibility="Collapsed" Margin="0,0,0,8">
+                            <Image.Clip>
+                                <RectangleGeometry Rect="0,0,999,70" RadiusX="6" RadiusY="6"/>
+                            </Image.Clip>
+                        </Image>
+
+                        <!-- Canción actual -->
+                        <Border DockPanel.Dock="Top"
+                                Background="#141320"
+                                BorderBrush="#2a1a4a" BorderThickness="1"
+                                CornerRadius="6" Padding="10,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock x:Name="MusicaTitulo"
+                                        Text="Sin reproducción"
+                                        FontSize="12" FontWeight="SemiBold"
+                                        Foreground="White"
+                                        TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="MusicaInfo"
+                                        Text="—"
+                                        FontSize="10"
+                                        Foreground="#555577"
+                                        Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Barra de progreso -->
+                        <Slider x:Name="MusicaProgreso"
+                                DockPanel.Dock="Top"
+                                Margin="0,0,0,8"
+                                Minimum="0" Maximum="1" Value="0"
+                                Height="4"
+                                IsMoveToPointEnabled="True"/>
+
+                        <!-- Controles de reproducción -->
+                        <StackPanel DockPanel.Dock="Top"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    Margin="0,0,0,8">
+                            <Button x:Name="BtnMusicaShuffle" Content="⇄" Width="28" Height="28"
+                                    Background="Transparent" BorderThickness="0"
+                                    Foreground="#555577" FontSize="14" Cursor="Hand"/>
+                            <Button x:Name="BtnMusicaAnterior" Content="⏮" Width="28" Height="28"
+                                    Background="Transparent" BorderThickness="0"
+                                    Foreground="White" FontSize="14" Cursor="Hand" Margin="4,0"/>
+                            <Button x:Name="BtnMusicaPlay" Content="▶" Width="36" Height="36"
+                                    Background="#2a1a5a" BorderThickness="0"
+                                    Foreground="White" FontSize="16" Cursor="Hand" Margin="4,0"/>
+                            <Button x:Name="BtnMusicaSiguiente" Content="⏭" Width="28" Height="28"
+                                    Background="Transparent" BorderThickness="0"
+                                    Foreground="White" FontSize="14" Cursor="Hand" Margin="4,0"/>
+                            <Button x:Name="BtnMusicaRepeat" Content="↻" Width="28" Height="28"
+                                    Background="Transparent" BorderThickness="0"
+                                    Foreground="#555577" FontSize="14" Cursor="Hand"/>
+                            <!-- Botón aleatorio -->
+                            <Button x:Name="BtnMusicaAleatorio" Content="⚡"
+                                    ToolTip="Canción aleatoria"
+                                    Width="28" Height="28" FontSize="13" Cursor="Hand"
+                                    Background="Transparent" BorderThickness="0"
+                                    Foreground="#555577" Margin="4,0,0,0"/>
+                        </StackPanel>
+
+                        <!-- Volumen -->
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
+                            <TextBlock Text="🔈" FontSize="11" Foreground="#555577" VerticalAlignment="Center"/>
+                            <Slider x:Name="MusicaVolumen"
+                                    Minimum="0" Maximum="1" Value="0.8"
+                                    Width="160" Margin="6,0"
+                                    IsMoveToPointEnabled="True"/>
+                            <TextBlock Text="🔊" FontSize="11" Foreground="#555577" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Header playlist + botones acción -->
+                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                            <TextBlock Text="PLAYLIST" FontSize="10"
+                                    Foreground="#555577" VerticalAlignment="Center"/>
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button x:Name="BtnMusicaNuevaPlaylist" Content="+ Lista"
+                                        FontSize="10" Padding="5,3" Cursor="Hand" Margin="0,0,4,0"
+                                        Background="#1a0a3a" Foreground="#9955BB"
+                                        BorderBrush="#3D2A6E" BorderThickness="1"/>
+                                <Button x:Name="BtnMusicaAgregarArchivo" Content="+ Archivo"
+                                        FontSize="10" Padding="5,3"
+                                        Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                        BorderThickness="1" Foreground="#7c3aed"
+                                        Cursor="Hand" Margin="0,0,4,0"/>
+                                <Button x:Name="BtnMusicaLimpiar" Content="Limpiar"
+                                        FontSize="10" Padding="5,3"
+                                        Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                        BorderThickness="1" Foreground="#555577"
+                                        Cursor="Hand"/>
+                            </StackPanel>
+                        </DockPanel>
+
+                        <!-- Export / Import -->
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                            <Button x:Name="BtnMusicaExportar" Content="↑ Exportar"
+                                    FontSize="10" Padding="6,3" Cursor="Hand" Margin="0,0,4,0"
+                                    Background="#1a0a3a" Foreground="#558855"
+                                    BorderBrush="#2A4E2A" BorderThickness="1"/>
+                            <Button x:Name="BtnMusicaImportar" Content="↓ Importar"
+                                    FontSize="10" Padding="6,3" Cursor="Hand"
+                                    Background="#1a0a3a" Foreground="#555588"
+                                    BorderBrush="#2A2A4E" BorderThickness="1"/>
+                        </StackPanel>
+
+                        <!-- Stream input -->
+                        <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox x:Name="MusicaStreamInput"
+                                    Grid.Column="0"
+                                    Background="#0d0d18" BorderBrush="#2a1a4a"
+                                    Foreground="White" FontSize="11"
+                                    Padding="6,4" BorderThickness="1"/>
+                            <Button x:Name="BtnMusicaAddStream" Content="+"
+                                    Grid.Column="1" Width="28"
+                                    Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                    BorderThickness="1" Foreground="#7c3aed"
+                                    FontSize="16" Cursor="Hand" Margin="4,0,0,0"/>
+                        </Grid>
+
+                        <!-- Lista de canciones -->
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel x:Name="MusicaPlaylist"/>
+                        </ScrollViewer>
+
+                    </DockPanel>
+                </Border>
+            </Grid>
         </Border>
 
         <!-- Popup buscador rápido del sidebar -->
         <Popup x:Name="PopupBuscadorSidebar"
             Grid.Row="1" Grid.RowSpan="2" Grid.Column="0"
-            Placement="Right" StaysOpen="False"
+            Placement="Right" StaysOpen="True"
             AllowsTransparency="True" PopupAnimation="Fade">
             <Border Background="#1E1E2E" BorderBrush="#3d2a6e"
                     BorderThickness="1" CornerRadius="0,8,8,0"

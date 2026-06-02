@@ -15,6 +15,7 @@
     --border: rgba(124,58,237,0.2);
     --text: rgba(255,255,255,0.85);
     --muted: rgba(255,255,255,0.35);
+    --accent-rgb: 124, 58, 237;
   }
 
   body {
@@ -369,9 +370,20 @@
     transform: translateY(10px);
     opacity: 0;
     transition: opacity 0.2s, transform 0.2s;
+    max-height: 80vh;
   }
   #customize-panel.open {
     display: flex; opacity: 1; transform: translateY(0);
+  }
+  #customize-panel-body {
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124,58,237,0.4) transparent;
+  }
+  #customize-panel-body::-webkit-scrollbar { width: 4px; }
+  #customize-panel-body::-webkit-scrollbar-thumb {
+    background: rgba(124,58,237,0.4); border-radius: 4px;
   }
   .cp-header {
     padding: 14px 16px 10px;
@@ -780,6 +792,38 @@
     transition: all 0.15s;
   }
 
+  /* ── Glow borders ── */
+  .widget-glow .widget {
+    border-color: rgba(var(--accent-rgb), 0.5) !important;
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.15),
+                inset 0 0 20px rgba(var(--accent-rgb), 0.04) !important;
+    transition: box-shadow 0.3s, border-color 0.3s !important;
+  }
+  .widget-glow .widget:hover {
+    border-color: rgba(var(--accent-rgb), 0.8) !important;
+    box-shadow: 0 0 0 1px rgba(var(--accent-rgb), 0.3),
+                0 0 24px rgba(var(--accent-rgb), 0.15),
+                inset 0 0 20px rgba(var(--accent-rgb), 0.06) !important;
+  }
+  .widget-glow #search-wrap:focus-within {
+    border-color: rgba(var(--accent-rgb), 0.8) !important;
+    box-shadow: 0 0 24px rgba(var(--accent-rgb), 0.25) !important;
+  }
+
+  /* ── Hover effects ── */
+  .hover-effects .widget {
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  }
+  .hover-effects .widget:hover {
+    transform: translateY(-3px) !important;
+  }
+  .hover-effects .dial-item {
+    transition: transform 0.15s ease !important;
+  }
+  .hover-effects .dial-item:hover {
+    transform: translateY(-4px) scale(1.05) !important;
+  }
+
 </style>
 </head>
 <body>
@@ -1043,74 +1087,133 @@
     <button class="cp-close" id="cp-close">×</button>
   </div>
 
-  <!-- Fondo -->
-  <div class="cp-section">
-    <div class="cp-section-title">🖼 Fondo</div>
-    <div class="cp-row">
-      <span>Imagen de fondo</span>
-      <div style="display:flex;gap:6px">
-        <button class="cp-btn" id="cp-elegir-fondo">Elegir</button>
-        <button class="cp-btn danger" id="cp-quitar-fondo">Quitar</button>
+  <div id="customize-panel-body">
+    <!-- Fondo -->
+    <div class="cp-section">
+      <div class="cp-section-title">🖼 Fondo</div>
+      <div class="cp-row">
+        <span>Imagen de fondo</span>
+        <div style="display:flex;gap:6px">
+          <button class="cp-btn" id="cp-elegir-fondo">Elegir</button>
+          <button class="cp-btn danger" id="cp-quitar-fondo">Quitar</button>
+        </div>
       </div>
+      <div class="cp-opac-label">
+        <span>Transparencia</span>
+        <span id="cp-opac-val">35%</span>
+      </div>
+      <input type="range" class="cp-slider" id="cp-opac-slider" min="0" max="80" value="35" />
     </div>
-    <div class="cp-opac-label">
-      <span>Transparencia</span>
-      <span id="cp-opac-val">35%</span>
-    </div>
-    <input type="range" class="cp-slider" id="cp-opac-slider" min="0" max="80" value="35" />
-  </div>
 
-  <!-- Widgets -->
-  <div class="cp-section">
-    <div class="cp-section-title">⚙ Widgets</div>
-    <div class="cp-row">
-      <span>🌤 Clima</span>
-      <button class="cp-toggle on" data-widget="w-clima"></button>
-    </div>
-    <div class="cp-row">
-      <span>📝 Notas</span>
-      <button class="cp-toggle on" data-widget="w-notas"></button>
-    </div>
-    <div class="cp-row">
-      <span>📰 Noticias</span>
-      <button class="cp-toggle on" data-widget="w-news"></button>
-    </div>
-    <div class="cp-row">
-      <span>⚡ Rendimiento</span>
-      <button class="cp-toggle on" data-widget="w-perf"></button>
-    </div>
-    <div class="cp-row">
-      <span>⏱ Temporizador</span>
-      <button class="cp-toggle on" data-widget="w-pomodoro"></button>
-    </div>
-    <div class="cp-row">
-      <span>✅ Tareas</span>
-      <button class="cp-toggle on" data-widget="w-tareas"></button>
-    </div>
-    <div class="cp-row">
-      <span>▶ Reproductor</span>
-      <button class="cp-toggle on" data-widget="w-musica"></button>
-    </div>
-    <div class="cp-row">
+    <!-- Widgets -->
+    <div class="cp-section">
+      <div class="cp-section-title">⚙ Widgets</div>
+      <div class="cp-row">
+        <span>🌤 Clima</span>
+        <button class="cp-toggle on" data-widget="w-clima"></button>
+      </div>
+      <div class="cp-row">
+        <span>📝 Notas</span>
+        <button class="cp-toggle on" data-widget="w-notas"></button>
+      </div>
+      <div class="cp-row">
+        <span>📰 Noticias</span>
+        <button class="cp-toggle on" data-widget="w-news"></button>
+      </div>
+      <div class="cp-row">
+        <span>⚡ Rendimiento</span>
+        <button class="cp-toggle on" data-widget="w-perf"></button>
+      </div>
+      <div class="cp-row">
+        <span>⏱ Temporizador</span>
+        <button class="cp-toggle on" data-widget="w-pomodoro"></button>
+      </div>
+      <div class="cp-row">
+        <span>✅ Tareas</span>
+        <button class="cp-toggle on" data-widget="w-tareas"></button>
+      </div>
+      <div class="cp-row">
+        <span>▶ Reproductor</span>
+        <button class="cp-toggle on" data-widget="w-musica"></button>
+      </div>
+      <div class="cp-row">
       <span>✨ Splash text</span>
       <button class="cp-toggle on" data-widget="splash"></button>
     </div>
-    <!-- Reloj -->
-    <div class="cp-section">
-      <div class="cp-section-title">🕐 Reloj</div>
-      <div class="cp-row">
-        <span>Mostrar segundos</span>
-        <button class="cp-toggle" id="cp-toggle-segundos"></button>
-      </div>
+  </div>
+
+  <!-- Apariencia -->
+  <div class="cp-section">
+    <div class="cp-section-title">✨ Apariencia</div>
+    <div class="cp-row">
+      <span>Glow en widgets</span>
+      <button class="cp-toggle on" id="cp-toggle-glow"></button>
+    </div>
+    <div class="cp-row">
+      <span>Hover effects</span>
+      <button class="cp-toggle on" id="cp-toggle-hover"></button>
+    </div>
+    <div class="cp-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+      <span>Tipografía</span>
+      <select id="cp-fuente" style="
+        width:100%;background:var(--surface2);border:1px solid var(--border);
+        border-radius:6px;padding:5px 8px;color:var(--text);
+        font-size:12px;cursor:pointer;outline:none;
+        font-family:'Segoe UI',sans-serif;margin-top:2px;
+      ">
+        <option value="Segoe UI">Segoe UI (default)</option>
+        <option value="Inter">Inter</option>
+        <option value="Rajdhani">Rajdhani</option>
+        <option value="Oxanium">Oxanium</option>
+        <option value="Share Tech Mono">Share Tech Mono</option>
+        <option value="Orbitron">Orbitron</option>
+        <option value="Nunito">Nunito</option>
+      </select>
     </div>
   </div>
 
-  <!-- Tema rápido -->
+  <!-- Reloj -->
   <div class="cp-section">
-    <div class="cp-section-title">🎨 Tema</div>
+    <div class="cp-section-title">🕐 Reloj</div>
     <div class="cp-row">
-      <span>Más opciones</span>
-      <button class="cp-btn" id="cp-ir-ajustes">Ajustes →</button>
+      <span>Mostrar segundos</span>
+      <button class="cp-toggle" id="cp-toggle-segundos"></button>
+    </div>
+    <div class="cp-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+      <span>Posición</span>
+      <select id="cp-pos-reloj" style="
+        width:100%;background:var(--surface2);border:1px solid var(--border);
+        border-radius:6px;padding:5px 8px;color:var(--text);
+        font-size:12px;cursor:pointer;outline:none;
+        font-family:'Segoe UI',sans-serif;margin-top:2px;
+      ">
+        <option value="centro">Centro</option>
+        <option value="top-left">Arriba izquierda</option>
+        <option value="top-right">Arriba derecha</option>
+        <option value="bottom-left">Abajo izquierda</option>
+      </select>
+    </div>
+    <div class="cp-row" style="flex-direction:column;align-items:flex-start;gap:6px">
+      <span>Estilo</span>
+      <select id="cp-estilo-reloj" style="
+        width:100%;background:var(--surface2);border:1px solid var(--border);
+        border-radius:6px;padding:5px 8px;color:var(--text);
+        font-size:12px;cursor:pointer;outline:none;
+        font-family:'Segoe UI',sans-serif;margin-top:2px;
+      ">
+        <option value="digital24">Digital 24h</option>
+        <option value="digital12">Digital 12h</option>
+      </select>
+    </div>
+  </div>
+
+    <!-- Tema rápido -->
+    <div class="cp-section">
+      <div class="cp-section-title">🎨 Tema</div>
+      <div class="cp-row">
+        <span>Más opciones</span>
+        <button class="cp-btn" id="cp-ir-ajustes">Ajustes →</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1126,6 +1229,23 @@
   let dials = [];
   let editIndex = -1;
   let ctxIndex  = -1;
+  let ntCfg = {
+    glow: true,
+    hover: true,
+    fuente: 'Segoe UI',
+    posReloj: 'centro',
+    estiloReloj: 'digital24'
+  };
+
+  (function() {
+    try {
+      const raw = localStorage.getItem('__nt_cfg__');
+    } catch {}
+  })();
+
+  function guardarNtCfg() {
+      window.chrome.webview.postMessage('ntcfg:guardar:' + JSON.stringify(ntCfg));
+  }
 
   let buscadorActivo = 'google';
 
@@ -1145,13 +1265,22 @@
 
   function updateClock() {
     const now = new Date();
-    const h = String(now.getHours()).padStart(2,'0');
+    let h = now.getHours();
     const m = String(now.getMinutes()).padStart(2,'0');
     const s = String(now.getSeconds()).padStart(2,'0');
+    let ampm = '';
+    if (window.__reloj12h) {
+      ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+    }
+    const hStr = String(h).padStart(2,'0');
     const seg = window.__segundos
       ? `<span style="font-size:0.45em;opacity:0.6;letter-spacing:0;margin-left:4px">:${s}</span>`
       : '';
-    document.getElementById('clock').innerHTML = h + '<span>:</span>' + m + seg;
+    const pmStr = ampm
+      ? `<span style="font-size:0.35em;opacity:0.7;margin-left:6px;letter-spacing:0.05em">${ampm}</span>`
+      : '';
+    document.getElementById('clock').innerHTML = hStr + '<span>:</span>' + m + seg + pmStr;
     const days   = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
     const months = ['enero','febrero','marzo','abril','mayo','junio',
                     'julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -1179,7 +1308,6 @@
     }
   }
 
-  iniciarReloj();
   window.chrome.webview.postMessage('get:segundos');
 
   // ── Toggle segundos ─────────────────────────────────
@@ -1409,6 +1537,13 @@
       iniciarReloj();
       return;
     }
+    if (raw.startsWith('ntcfg:')) {
+        try {
+            ntCfg = { ...ntCfg, ...JSON.parse(raw.slice('ntcfg:'.length)) };
+            aplicarNtCfg();
+        } catch {}
+        return;
+    }
     if (raw.startsWith('tema:'))  { aplicarTema(JSON.parse(raw.slice(5))); }
     if (raw.startsWith('fondo:opacidad:')) {
       const op = parseInt(raw.slice('fondo:opacidad:'.length));
@@ -1490,35 +1625,31 @@
   async function iniciarClima() {
     const body = document.getElementById('w-clima-body');
     try {
-      // Usamos wttr.in que no requiere API key ni permisos
-      const res  = await fetch('https://wttr.in/?format=j1');
-      const data = await res.json();
-      const cur  = data.current_condition[0];
-      const area = data.nearest_area[0];
-      const ciudad = area.areaName[0].value + ', ' + area.country[0].value;
-      const temp   = cur.temp_C;
-      const desc   = cur.weatherDesc[0].value;
-      const wcode  = parseInt(cur.weatherCode);
+        // 1. Obtener ubicación por IP
+        const geoRes  = await fetch('http://ip-api.com/json/?fields=city,country,lat,lon,status');
+        const geoData = await geoRes.json();
+        if (geoData.status !== 'success') throw new Error('geo fail');
 
-      // Mapear código wttr a nuestro iconoClima
-      let icono = '🌤️';
-      if (wcode === 113) icono = '☀️';
-      else if (wcode <= 116) icono = '🌤️';
-      else if (wcode <= 119) icono = '☁️';
-      else if (wcode <= 143) icono = '🌫️';
-      else if (wcode <= 266) icono = '🌧️';
-      else if (wcode <= 338) icono = '❄️';
-      else if (wcode <= 377) icono = '🌨️';
-      else icono = '⛈️';
+        const ciudad = geoData.city + ', ' + geoData.country;
+        const lat    = geoData.lat;
+        const lon    = geoData.lon;
 
-      body.innerHTML = `
-        <div id="w-clima-icon">${icono}</div>
-        <div>
-          <div id="w-clima-temp">${temp}°C</div>
-          <div id="w-clima-desc">${ciudad}</div>
-        </div>`;
+        // 2. Obtener clima con open-meteo
+        const climaRes  = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&temperature_unit=celsius`);
+        const climaData = await climaRes.json();
+        const cur       = climaData.current_weather;
+        const temp      = Math.round(cur.temperature);
+        const icono     = iconoClima(cur.weathercode);
+
+        body.innerHTML = `
+            <div id="w-clima-icon">${icono}</div>
+            <div>
+                <div id="w-clima-temp">${temp}°C</div>
+                <div id="w-clima-desc">${ciudad}</div>
+            </div>`;
     } catch {
-      body.innerHTML = '<span class="clima-msg">Sin conexión</span>';
+        body.innerHTML = '<span class="clima-msg">Sin conexión</span>';
     }
   }
 
@@ -1534,31 +1665,50 @@
     }, 800);
   });
 
-  // ── Widget Noticias ────────────────────────────────
   async function cargarNoticias() {
     const lista = document.getElementById('w-news-list');
-    try {
-      const proxy = 'https://api.allorigins.win/get?url=';
-      const feed  = 'https://www.theverge.com/rss/index.xml';
-      const res   = await fetch(proxy + encodeURIComponent(feed));
-      const json  = await res.json();
-      const xml   = new DOMParser().parseFromString(json.contents, 'text/xml');
-      const items = Array.from(xml.querySelectorAll('item, entry')).slice(0, 4);
+    const proxy = 'https://api.allorigins.win/get?url=';
 
-      lista.innerHTML = '';
-      items.forEach(item => {
-        const titulo = item.querySelector('title')?.textContent ?? '';
-        const linkEl = item.querySelector('link');
-        const link   = linkEl?.textContent?.trim() || linkEl?.getAttribute('href') || '#';
+    const fuentes = [
+        { url: 'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada', nombre: 'El País' },
+        { url: 'https://www.bbc.com/mundo/index.xml', nombre: 'BBC Mundo' },
+        { url: 'https://rss.nytimes.com/services/xml/rss/nyt/es.xml', nombre: 'NYT Español' },
+        { url: 'https://feeds.univision.com/feeds/article/rss/noticias', nombre: 'Univisión' },
+    ];
+
+    const noticias = [];
+
+    await Promise.allSettled(fuentes.map(async fuente => {
+        try {
+            const res  = await fetch(proxy + encodeURIComponent(fuente.url));
+            const json = await res.json();
+            const xml  = new DOMParser().parseFromString(json.contents, 'text/xml');
+            const items = Array.from(xml.querySelectorAll('item, entry')).slice(0, 4);
+            items.forEach(item => {
+                const titulo = item.querySelector('title')?.textContent?.trim() ?? '';
+                const linkEl = item.querySelector('link');
+                const link   = linkEl?.textContent?.trim() || linkEl?.getAttribute('href') || '#';
+                if (titulo) noticias.push({ titulo, link, fuente: fuente.nombre });
+            });
+        } catch { }
+    }));
+
+    lista.innerHTML = '';
+    if (noticias.length === 0) {
+        lista.innerHTML = '<span class="news-msg">Sin conexión</span>';
+        return;
+    }
+
+    // Mezclar noticias de distintas fuentes
+    noticias.sort(() => Math.random() - 0.5);
+
+    noticias.slice(0, 12).forEach(n => {
         const el = document.createElement('div');
         el.className = 'news-item';
-        el.innerHTML = `<div class="news-title">${titulo}</div><div class="news-source">The Verge</div>`;
-        el.addEventListener('click', () => { window.location.href = link; });
+        el.innerHTML = `<div class="news-title">${n.titulo}</div><div class="news-source">${n.fuente}</div>`;
+        el.addEventListener('click', () => { window.open(n.link, '_blank'); });
         lista.appendChild(el);
-      });
-    } catch {
-      lista.innerHTML = '<span class="news-msg">Sin conexión</span>';
-    }
+    });
   }
 
   // ── Init ───────────────────────────────────────────
@@ -1662,7 +1812,6 @@
   })();
 
   // ── Widget Tareas ──────────────────────────────────
-  document.addEventListener('DOMContentLoaded', function() {
   (function() {
     let tareas = [];
 
@@ -1729,7 +1878,6 @@
 
     window.chrome.webview.postMessage('get:tareas');
   })();
-  }); // DOMContentLoaded
 
   // ── Widget Música ──────────────────────────────────
   document.addEventListener('DOMContentLoaded', function() {
@@ -1856,6 +2004,43 @@
       if (widget) widget.style.display = btn.classList.contains('on') ? '' : 'none';
       guardarConfigWidgets();
     });
+  });
+
+  // Glow
+  document.getElementById('cp-toggle-glow')?.addEventListener('click', function() {
+    ntCfg.glow = !ntCfg.glow;
+    this.classList.toggle('on', ntCfg.glow);
+    guardarNtCfg();
+    aplicarNtCfg();
+  });
+
+  // Hover
+  document.getElementById('cp-toggle-hover')?.addEventListener('click', function() {
+    ntCfg.hover = !ntCfg.hover;
+    this.classList.toggle('on', ntCfg.hover);
+    guardarNtCfg();
+    aplicarNtCfg();
+  });
+
+  // Tipografía
+  document.getElementById('cp-fuente')?.addEventListener('change', function() {
+    ntCfg.fuente = this.value;
+    guardarNtCfg();
+    aplicarNtCfg();
+  });
+
+  // Posición del reloj
+  document.getElementById('cp-pos-reloj')?.addEventListener('change', function() {
+    ntCfg.posReloj = this.value;
+    guardarNtCfg();
+    aplicarNtCfg();
+  });
+
+  // Estilo del reloj
+  document.getElementById('cp-estilo-reloj')?.addEventListener('change', function() {
+    ntCfg.estiloReloj = this.value;
+    guardarNtCfg();
+    aplicarNtCfg();
   });
 
   // Aplicar estado inicial del splash desde config guardada
@@ -2020,6 +2205,65 @@
 
   window.chrome.webview.postMessage('get:perfiles');
   window.chrome.webview.postMessage('get:widgets:config');
+  window.chrome.webview.postMessage('get:ntcfg');
+
+  function aplicarNtCfg() {
+    // Glow
+    document.body.classList.toggle('widget-glow', ntCfg.glow);
+
+    // Hover
+    document.body.classList.toggle('hover-effects', ntCfg.hover);
+
+    // Tipografía
+    if (ntCfg.fuente && ntCfg.fuente !== 'Segoe UI') {
+      const link = document.getElementById('__nt_font__') || document.createElement('link');
+      link.id = '__nt_font__';
+      link.rel = 'stylesheet';
+      link.href = `https://fonts.googleapis.com/css2?family=${ntCfg.fuente.replace(/ /g,'+')}&display=swap`;
+      document.head.appendChild(link);
+    }
+    document.body.style.fontFamily = `'${ntCfg.fuente}', 'Segoe UI', sans-serif`;
+
+    // Posición del reloj
+    const clockWrap = document.getElementById('clock-wrap');
+    if (clockWrap) {
+      clockWrap.style.position = '';
+      clockWrap.style.top = '';
+      clockWrap.style.left = '';
+      clockWrap.style.right = '';
+      clockWrap.style.bottom = '';
+      clockWrap.style.transform = '';
+      if (ntCfg.posReloj === 'top-left') {
+        clockWrap.style.position = 'fixed';
+        clockWrap.style.top = '80px';
+        clockWrap.style.left = '80px';
+      } else if (ntCfg.posReloj === 'top-right') {
+        clockWrap.style.position = 'fixed';
+        clockWrap.style.top = '80px';
+        clockWrap.style.right = '80px';
+      } else if (ntCfg.posReloj === 'bottom-left') {
+        clockWrap.style.position = 'fixed';
+        clockWrap.style.bottom = '80px';
+        clockWrap.style.left = '80px';
+      }
+    }
+
+    // Estilo del reloj (12h/24h)
+    window.__reloj12h = ntCfg.estiloReloj === 'digital12';
+    updateClock();
+
+    // Sincronizar controles del panel
+    const toggleGlow = document.getElementById('cp-toggle-glow');
+    const toggleHover = document.getElementById('cp-toggle-hover');
+    const selFuente = document.getElementById('cp-fuente');
+    const selPos = document.getElementById('cp-pos-reloj');
+    const selEstilo = document.getElementById('cp-estilo-reloj');
+    if (toggleGlow) toggleGlow.classList.toggle('on', ntCfg.glow);
+    if (toggleHover) toggleHover.classList.toggle('on', ntCfg.hover);
+    if (selFuente) selFuente.value = ntCfg.fuente;
+    if (selPos) selPos.value = ntCfg.posReloj;
+    if (selEstilo) selEstilo.value = ntCfg.estiloReloj;
+  }
 
   // ── Splash text ───────────────────────────────────
   (function() {

@@ -337,6 +337,9 @@ input[type="range"] {
 }
 .radio-row input[type=radio] { accent-color: var(--accent); width: 15px; height: 15px; }
 
+#toggle-previews:checked + span { background: var(--accent); }
+#toggle-previews:checked ~ #toggle-previews-knob { transform: translateX(18px); }
+
 </style>
 </head>
 <body>
@@ -345,7 +348,7 @@ input[type="range"] {
   <div id="sidebar-header">
     <div id="accent-bar"></div>
     <h1>AtsukiBrowser</h1>
-    <p>v1.0.0</p>
+    <p id="sb-version">v1.0.0</p>
   </div>
 
   <div class="sb-section">
@@ -393,7 +396,7 @@ input[type="range"] {
   </div>
 
   <div id="sidebar-footer">
-    <p>AtsukiBrowser · v1.0.0</p>
+    <p id="sb-footer-version">AtsukiBrowser · v1.0.0</p>
   </div>
 </div>
 
@@ -742,6 +745,35 @@ input[type="range"] {
                 onmouseout="this.style.opacity='1'">
           Buscar actualizaciones
         </button>
+      </div>
+
+      <!-- Canal de actualizaciones -->
+      <div style="display:flex; align-items:center; justify-content:space-between;
+                  background:var(--surface2); border:1px solid var(--border);
+                  border-radius:12px; padding:16px 24px; margin-bottom:12px;">
+        <div>
+          <div style="font-size:13px; font-weight:500; color:var(--text); margin-bottom:4px;">
+            Versiones preview
+          </div>
+          <div style="font-size:11px; color:var(--muted); max-width:340px; line-height:1.5;">
+            Recibe versiones anticipadas con nuevas funciones. Pueden ser inestables.
+          </div>
+        </div>
+        <label style="position:relative; display:inline-block; width:40px; height:22px; flex-shrink:0; cursor:pointer;">
+          <input type="checkbox" id="toggle-previews" style="opacity:0; width:0; height:0; position:absolute;">
+          <span id="toggle-previews-track" style="
+            position:absolute; inset:0;
+            background:#2a1a4a; border-radius:22px;
+            transition:background 0.2s;
+            box-shadow: inset 0 0 0 1px var(--border);
+          "></span>
+          <span id="toggle-previews-knob" style="
+            position:absolute; left:3px; top:3px;
+            width:16px; height:16px; border-radius:50%;
+            background:white; transition:transform 0.2s;
+            pointer-events:none;
+          "></span>
+        </label>
       </div>
 
       <!-- Card estado -->
@@ -1293,7 +1325,7 @@ input[type="range"] {
   // ── Rendimiento ────────────────────────────────────
   let perfConfig = {
     suspender_tabs:   true,
-    limpiar_cache:    false,
+    limpiar_cache:    true,
     limite_tabs:      false,
     limite_tabs_n:    10,
     no_restaurar:     false,
@@ -1548,6 +1580,21 @@ input[type="range"] {
   }
 
   // Recibir respuesta del C#
+
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string') return;
+    if (raw.startsWith('version:')) {
+      const v = raw.slice('version:'.length);
+      const el1 = document.getElementById('sb-version');
+      const el2 = document.getElementById('sb-footer-version');
+      const el3 = document.getElementById('version-actual');
+      if (el1) el1.textContent = 'v' + v;
+      if (el2) el2.textContent = 'AtsukiBrowser · v' + v;
+      if (el3) el3.textContent = 'v' + v;
+    }
+  });
+  
   window.chrome.webview.addEventListener('message', e => {
       const raw = e.data;
       if (raw.startsWith('update:')) {
@@ -1576,6 +1623,28 @@ input[type="range"] {
               notas.textContent  = `Versión ${data.version} es la más reciente.`;
           }
       }
+      else if (raw.startsWith('previews:')) {
+          const activo = raw.slice('previews:'.length) === 'true';
+          actualizarTogglePreviews(activo);
+      }
+  });
+
+  function actualizarTogglePreviews(activo) {
+      const track = document.getElementById('toggle-previews-track');
+      const knob  = document.getElementById('toggle-previews-knob');
+      const input = document.getElementById('toggle-previews');
+      if (!track || !knob || !input) return;
+      input.checked = activo;
+      track.style.background = activo ? 'var(--accent)' : '#2a1a4a';
+      knob.style.transform = activo ? 'translateX(18px)' : 'translateX(0)';
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+      const label = document.querySelector('label[for="toggle-previews"], #toggle-previews')?.closest('label');
+      document.getElementById('toggle-previews')?.addEventListener('change', function() {
+          actualizarTogglePreviews(this.checked);
+          window.chrome.webview.postMessage(this.checked ? 'previews:activar' : 'previews:desactivar');
+      });
   });
 </script>
 </body>

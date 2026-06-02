@@ -29,6 +29,9 @@ namespace atsukibrowser
             if (string.IsNullOrWhiteSpace(url)) return;
             if (url.StartsWith("file:///")) return;
 
+            // Eliminar entradas duplicadas de la misma URL
+            _entradas.RemoveAll(e => e.Url == url);
+
             _entradas.Insert(0, new EntradaHistorial
             {
                 Url = url,
@@ -39,7 +42,8 @@ namespace atsukibrowser
             if (_entradas.Count > 500)
                 _entradas.RemoveAt(_entradas.Count - 1);
 
-            Guardar();
+            // Guardar en background para no bloquear la UI
+            Task.Run(Guardar);
         }
 
         public void Limpiar()

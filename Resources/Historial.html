@@ -270,7 +270,7 @@
   <div id="sidebar-header">
     <div id="accent-bar"></div>
     <h1>AtsukiBrowser</h1>
-    <p>v0.4 Alpha</p>
+    <p id="sb-version">v1.0.0</p>
   </div>
 
   <div class="sb-section">
@@ -294,7 +294,7 @@
   </div>
 
   <div id="sidebar-footer">
-    <p>AtsukiBrowser · v0.4 Alpha</p>
+    <p id="sb-footer-version">AtsukiBrowser · v1.0.0</p>
   </div>
 </div>
 
@@ -343,6 +343,13 @@
     }
     if (typeof raw === 'string' && raw.startsWith('tema:')) {
       aplicarTema(JSON.parse(raw.slice('tema:'.length)));
+    }
+    if (typeof raw === 'string' && raw.startsWith('version:')) {
+      const v = raw.slice('version:'.length);
+      const el1 = document.getElementById('sb-version');
+      const el2 = document.getElementById('sb-footer-version');
+      if (el1) el1.textContent = 'v' + v;
+      if (el2) el2.textContent = 'AtsukiBrowser · v' + v;
     }
   });
 
