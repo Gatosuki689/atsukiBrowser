@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>AtsukiDocs</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.snow.css" rel="stylesheet"/>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --accent: #7c3aed;
+  --accent2: #a78bfa;
+  --bg: #0d0d14;
+  --surface: #13131f;
+  --surface2: #1a1a2e;
+  --border: rgba(124,58,237,0.2);
+  --text: rgba(255,255,255,0.85);
+  --muted: rgba(255,255,255,0.35);
+  --danger: #ef4444;
+}
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── TOPBAR ── */
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 48px;
+  background: #0a0a10;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+#app-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+#app-title span { color: var(--accent2); }
+
+#doc-name {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: 'Segoe UI', sans-serif;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  transition: border-color 0.15s;
+  max-width: 300px;
+}
+#doc-name:hover { border-color: var(--border); }
+#doc-name:focus { border-color: rgba(124,58,237,0.5); background: var(--surface); }
+
+#doc-status {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.topbar-btn {
+  background: rgba(124,58,237,0.1);
+  border: 1px solid var(--border);
+  color: var(--accent2);
+  padding: 0 14px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: 'Segoe UI', sans-serif;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.topbar-btn:hover { background: rgba(124,58,237,0.22); }
+.topbar-btn.primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+.topbar-btn.primary:hover { background: #6d28d9; }
+
+/* ── TAB BAR ── */
+#tabbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 12px;
+  height: 36px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  overflow-x: auto;
+}
+#tabbar::-webkit-scrollbar { height: 3px; }
+#tabbar::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 2px; }
+
+.doc-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px 0 14px;
+  height: 26px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.doc-tab:hover { background: var(--surface2); color: var(--text); }
+.doc-tab.active {
+  background: rgba(124,58,237,0.15);
+  border-color: rgba(124,58,237,0.3);
+  color: var(--accent2);
+}
+.doc-tab .tab-close {
+  opacity: 0;
+  font-size: 12px;
+  line-height: 1;
+  padding: 1px 3px;
+  border-radius: 3px;
+  transition: all 0.15s;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+}
+.doc-tab:hover .tab-close { opacity: 0.5; }
+.doc-tab .tab-close:hover { opacity: 1 !important; background: rgba(239,68,68,0.2); color: var(--danger); }
+.doc-tab .tab-unsaved {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--accent2);
+  flex-shrink: 0;
+}
+
+#btn-nueva-tab {
+  width: 26px; height: 26px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+#btn-nueva-tab:hover { background: var(--surface2); color: var(--text); }
+
+/* ── BODY: sidebar + editor ── */
+#docs-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ── */
+#sidebar {
+  width: 220px;
+  background: #0a0a10;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  transition: width 0.2s;
+  overflow: hidden;
+}
+#sidebar.collapsed { width: 0; }
+
+#sidebar-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  flex-shrink: 0;
+}
+#sidebar-header span {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  flex: 1;
+}
+
+#recientes-lista {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+#recientes-lista::-webkit-scrollbar { width: 4px; }
+#recientes-lista::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 2px; }
+
+.reciente-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.reciente-item:hover { background: var(--surface2); }
+.reciente-item .rec-icon { font-size: 14px; flex-shrink: 0; }
+.reciente-item .rec-info { flex: 1; overflow: hidden; }
+.reciente-item .rec-nombre {
+  font-size: 11px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reciente-item .rec-fecha {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* ── EDITOR AREA ── */
+#editor-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* Quill toolbar override */
+#toolbar-container {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border) !important;
+  border-top: none !important;
+  border-left: none !important;
+  border-right: none !important;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+
+.ql-toolbar.ql-snow {
+  background: var(--surface);
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  padding: 6px 12px;
+}
+.ql-toolbar .ql-stroke { stroke: var(--muted); }
+.ql-toolbar .ql-fill { fill: var(--muted); }
+.ql-toolbar .ql-picker-label { color: var(--muted); }
+.ql-toolbar button:hover .ql-stroke,
+.ql-toolbar .ql-active .ql-stroke { stroke: var(--accent2); }
+.ql-toolbar button:hover .ql-fill,
+.ql-toolbar .ql-active .ql-fill { fill: var(--accent2); }
+.ql-toolbar .ql-picker-label:hover,
+.ql-toolbar .ql-picker-label.ql-active { color: var(--accent2); }
+.ql-picker-options {
+  background: var(--surface2) !important;
+  border-color: var(--border) !important;
+}
+.ql-picker-item:hover { color: var(--accent2) !important; }
+
+.ql-container.ql-snow {
+  border: none !important;
+  flex: 1;
+  overflow: hidden;
+}
+
+#quill-editor {
+  flex: 1;
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--bg);
+  max-width: 860px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 40px 60px;
+}
+#quill-editor::-webkit-scrollbar { width: 6px; }
+#quill-editor::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 3px; }
+
+.ql-editor { color: var(--text); min-height: calc(100vh - 200px); }
+.ql-editor.ql-blank::before { color: var(--muted); font-style: normal; }
+
+#quill-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── TOAST ── */
+#toast {
+  position: fixed;
+  bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  opacity: 0;
+  transition: all 0.25s;
+  z-index: 1000;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+#tabs-container {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.rec-del {
+  opacity: 0;
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.reciente-item:hover .rec-del { opacity: 0.5; }
+.rec-del:hover { opacity: 1 !important; color: var(--danger); }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <button id="btn-back" class="topbar-btn" title="Volver">←</button>
+  <div id="app-title">Atsuki<span>Docs</span></div>
+  <input id="doc-name" type="text" value="Sin título" spellcheck="false"/>
+  <span id="doc-status">Guardado</span>
+  <div style="margin-left:auto;display:flex;gap:8px">
+    <button class="topbar-btn" id="btn-abrir">📂 Abrir</button>
+    <button class="topbar-btn" id="btn-guardar">💾 Guardar</button>
+    <button class="topbar-btn primary" id="btn-exportar">⬇ Exportar</button>
+  </div>
+</div>
+
+<!-- TAB BAR -->
+<div id="tabbar">
+  <div id="tabs-container"></div>
+  <button id="btn-nueva-tab">+</button>
+</div>
+
+<!-- BODY -->
+<div id="docs-body">
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <span>Recientes</span>
+      <button id="btn-colapsar-sidebar" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px">◀</button>
+    </div>
+    <div id="recientes-lista"></div>
+  </div>
+
+  <!-- Editor -->
+  <div id="editor-area">
+    <div id="quill-wrap">
+      <!-- Quill se monta aquí -->
+      <div id="quill-editor"></div>
+    </div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
+<script>
+// ═══════════════════════════════════════════════
+//  ESTADO
+// ═══════════════════════════════════════════════
+let docs = [];        // array de documentos abiertos
+let docActivoId = null;
+let nextDocId = 0;
+let recientes = [];   // [ { nombre, ruta, fecha } ]
+let autoGuardadoTimer = null;
+
+// ═══════════════════════════════════════════════
+//  QUILL
+// ═══════════════════════════════════════════════
+const quill = new Quill('#quill-editor', {
+  theme: 'snow',
+  placeholder: 'Empieza a escribir...',
+  modules: {
+    toolbar: [
+      [{ font: [] }, { size: ['small', false, 'large', 'huge'] }],
+      ['bold', 'italic', 'underline', 'strike'],
+      [{ color: [] }, { background: [] }],
+      [{ align: [] }],
+      [{ list: 'ordered' }, { list: 'bullet' }],
+      [{ indent: '-1' }, { indent: '+1' }],
+      ['blockquote', 'code-block'],
+      ['link', 'image'],
+      ['clean']
+    ]
+  }
+});
+
+// Detectar cambios → marcar como no guardado
+quill.on('text-change', () => {
+  const doc = docActivo();
+  if (!doc) return;
+  if (!doc.sucio) {
+    doc.sucio = true;
+    renderTabs();
+  }
+  doc.contenido = quill.getContents();
+  doc.html      = quill.root.innerHTML;
+
+  // Auto-guardado si tiene ruta
+  clearTimeout(autoGuardadoTimer);
+  if (doc.ruta) {
+    autoGuardadoTimer = setTimeout(() => guardarDoc(doc, true), 5000);
+  }
+
+  actualizarStatus('Sin guardar');
+});
+
+// ═══════════════════════════════════════════════
+//  DOCUMENTOS
+// ═══════════════════════════════════════════════
+function docActivo() {
+  return docs.find(d => d.id === docActivoId) ?? null;
+}
+
+function crearDoc(nombre = 'Sin título', contenido = null, ruta = null) {
+  const doc = {
+    id:       nextDocId++,
+    nombre,
+    ruta,
+    contenido: contenido ?? { ops: [] },
+    html:      '',
+    sucio:     false
+  };
+  docs.push(doc);
+  return doc;
+}
+
+function activarDoc(id) {
+  docActivoId = id;
+  const doc = docActivo();
+  if (!doc) return;
+
+  // Cargar contenido en Quill
+  quill.setContents(doc.contenido, 'silent');
+  document.getElementById('doc-name').value = doc.nombre;
+  actualizarStatus(doc.sucio ? 'Sin guardar' : doc.ruta ? 'Guardado' : 'Nuevo');
+  renderTabs();
+}
+
+function cerrarDoc(id) {
+  const doc = docs.find(d => d.id === id);
+  if (!doc) return;
+
+  if (doc.sucio) {
+    if (!confirm(`"${doc.nombre}" tiene cambios sin guardar. ¿Cerrar de todas formas?`)) return;
+  }
+
+  const idx = docs.findIndex(d => d.id === id);
+  docs.splice(idx, 1);
+
+  if (docs.length === 0) {
+    // Crear uno vacío si se cierran todos
+    const nuevo = crearDoc();
+    activarDoc(nuevo.id);
+  } else {
+    const siguiente = docs[Math.min(idx, docs.length - 1)];
+    activarDoc(siguiente.id);
+  }
+
+  renderTabs();
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER TABS
+// ═══════════════════════════════════════════════
+function renderTabs() {
+  const container = document.getElementById('tabs-container');
+  container.innerHTML = '';
+
+  for (const doc of docs) {
+    const tab = document.createElement('div');
+    tab.className = 'doc-tab' + (doc.id === docActivoId ? ' active' : '');
+
+    tab.innerHTML = `
+      ${doc.sucio ? '<span class="tab-unsaved"></span>' : ''}
+      <span class="tab-nombre">${doc.nombre}</span>
+      <button class="tab-close" title="Cerrar">✕</button>
+    `;
+
+    tab.addEventListener('click', (e) => {
+      if (e.target.classList.contains('tab-close')) return;
+      activarDoc(doc.id);
+    });
+    tab.querySelector('.tab-close').addEventListener('click', (e) => {
+      e.stopPropagation();
+      cerrarDoc(doc.id);
+    });
+
+    container.appendChild(tab);
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  GUARDAR / ABRIR
+// ═══════════════════════════════════════════════
+function guardarDoc(doc, silencioso = false) {
+  if (!doc) return;
+  const nombre = document.getElementById('doc-name').value.trim() || 'Sin título';
+  doc.nombre = nombre;
+
+  if (doc.ruta) {
+    // Guardar en ruta existente
+    window.chrome.webview.postMessage('docs:guardar:' + JSON.stringify({
+      ruta:    doc.ruta,
+      nombre:  doc.nombre,
+      html:    doc.html,
+      texto:   quill.getText()
+    }));
+    doc.sucio = false;
+    renderTabs();
+    if (!silencioso) { toast('✓ Guardado'); actualizarStatus('Guardado'); }
+  } else {
+    // Pedir ruta a C#
+    window.chrome.webview.postMessage('docs:guardar-como:' + JSON.stringify({
+      nombre:  doc.nombre,
+      html:    doc.html,
+      texto:   quill.getText()
+    }));
+  }
+}
+
+function actualizarStatus(texto) {
+  document.getElementById('doc-status').textContent = texto;
+}
+
+// ═══════════════════════════════════════════════
+//  RECIENTES
+// ═══════════════════════════════════════════════
+function renderRecientes() {
+  const lista = document.getElementById('recientes-lista');
+  lista.innerHTML = '';
+
+  if (recientes.length === 0) {
+    lista.innerHTML = '<div style="padding:12px;font-size:11px;color:var(--muted);text-align:center">Sin archivos recientes</div>';
+    return;
+  }
+
+  const iconos = { txt: '📄', html: '🌐', md: '📝', docx: '📘', default: '📄' };
+
+  for (const rec of recientes) {
+    const ext = rec.nombre.split('.').pop().toLowerCase();
+    const item = document.createElement('div');
+    item.className = 'reciente-item';
+    item.innerHTML = `
+      <span class="rec-icon">${iconos[ext] ?? iconos.default}</span>
+      <div class="rec-info">
+        <div class="rec-nombre">${rec.nombre}</div>
+        <div class="rec-fecha">${rec.fecha}</div>
+      </div>
+      <button class="rec-del" title="Quitar de recientes">✕</button>
+    `;
+    item.querySelector('.rec-info').addEventListener('click', () => {
+      window.chrome.webview.postMessage('docs:abrir-ruta:' + rec.ruta);
+    });
+    item.querySelector('.rec-del').addEventListener('click', (e) => {
+      e.stopPropagation();
+      recientes = recientes.filter(r => r.ruta !== rec.ruta);
+      renderRecientes();
+      window.chrome.webview.postMessage('docs:recientes:guardar:' + JSON.stringify(recientes));
+    });
+    lista.appendChild(item);
+  }
+}
+
+console.log('LISTENERS INIT');
+  document.getElementById('btn-abrir').addEventListener('click', () => {
+    console.log('btn-abrir clicked');
+    window.chrome.webview.postMessage('docs:abrir');
+  });
+
+// ═══════════════════════════════════════════════
+//  LISTENERS BOTONES
+// ═══════════════════════════════════════════════
+document.getElementById('btn-back').addEventListener('click', () =>
+  window.chrome.webview.postMessage('navigate:nuevatab'));
+
+document.getElementById('btn-nueva-tab').addEventListener('click', () => {
+  const doc = crearDoc();
+  activarDoc(doc.id);
+  renderTabs();
+});
+
+document.getElementById('btn-guardar').addEventListener('click', () => {
+  guardarDoc(docActivo());
+});
+
+document.getElementById('btn-abrir').addEventListener('click', () => {
+  window.chrome.webview.postMessage('docs:abrir');
+});
+
+document.getElementById('btn-exportar').addEventListener('click', () => {
+  // Por ahora solo exportar como HTML
+  const doc = docActivo();
+  if (!doc) return;
+  window.chrome.webview.postMessage('docs:exportar:' + JSON.stringify({
+    nombre: doc.nombre,
+    html:   doc.html
+  }));
+});
+
+document.getElementById('doc-name').addEventListener('input', () => {
+  const doc = docActivo();
+  if (!doc) return;
+  doc.nombre = document.getElementById('doc-name').value;
+  doc.sucio  = true;
+  renderTabs();
+});
+
+document.getElementById('btn-colapsar-sidebar').addEventListener('click', () => {
+  const sb = document.getElementById('sidebar');
+  sb.classList.toggle('collapsed');
+  document.getElementById('btn-colapsar-sidebar').textContent =
+    sb.classList.contains('collapsed') ? '▶' : '◀';
+});
+
+// ═══════════════════════════════════════════════
+//  COMUNICACIÓN C#
+// ═══════════════════════════════════════════════
+window.chrome.webview.addEventListener('message', e => {
+  const raw = e.data;
+  if (typeof raw !== 'string') return;
+
+  if (raw.startsWith('docs:contenido:')) {
+    const data = JSON.parse(raw.slice('docs:contenido:'.length));
+
+    // Evitar duplicar si ya está abierto
+    const yaAbierto = docs.find(d => d.ruta === data.ruta);
+    if (yaAbierto) {
+      activarDoc(yaAbierto.id);
+      return;
+    }
+
+    const doc  = crearDoc(data.nombre, null, data.ruta);
+    doc.html   = data.html ?? '';
+    quill.clipboard.dangerouslyPasteHTML(data.html ?? '');
+    doc.contenido = quill.getContents();
+    doc.sucio  = false;
+    activarDoc(doc.id);
+    renderTabs();
+    agregarReciente(data.nombre, data.ruta);
+
+  } else if (raw.startsWith('docs:error:no-existe:')) {
+    const ruta = raw.slice('docs:error:no-existe:'.length);
+    // Quitar de recientes
+    recientes = recientes.filter(r => r.ruta !== ruta);
+    renderRecientes();
+    window.chrome.webview.postMessage('docs:recientes:guardar:' + JSON.stringify(recientes));
+    toast('⚠ Archivo no encontrado');
+
+  } else if (raw.startsWith('docs:guardado:')) {
+    const data = JSON.parse(raw.slice('docs:guardado:'.length));
+    const doc  = docActivo();
+    if (doc) {
+      doc.ruta  = data.ruta;
+      doc.sucio = false;
+      renderTabs();
+      agregarReciente(doc.nombre, data.ruta);
+    }
+    toast('✓ Guardado');
+    actualizarStatus('Guardado');
+
+  } else if (raw.startsWith('docs:recientes:')) {
+    recientes = JSON.parse(raw.slice('docs:recientes:'.length));
+    renderRecientes();
+
+  } else if (raw.startsWith('tema:')) {
+    const t = JSON.parse(raw.slice('tema:'.length));
+    aplicarTema(t);
+  }
+});
+
+function agregarReciente(nombre, ruta) {
+  recientes = recientes.filter(r => r.ruta !== ruta);
+  recientes.unshift({
+    nombre,
+    ruta,
+    fecha: new Date().toLocaleDateString('es-MX', { day:'numeric', month:'short', year:'numeric' })
+  });
+  recientes = recientes.slice(0, 20);
+  renderRecientes();
+  window.chrome.webview.postMessage('docs:recientes:guardar:' + JSON.stringify(recientes));
+}
+
+function aplicarTema(t) {
+  const r = document.documentElement;
+  const hex = t.Accent ?? t.accent ?? '#7c3aed';
+  r.style.setProperty('--accent', hex);
+  r.style.setProperty('--bg',       t.Bg      ?? t.bg      ?? '#0d0d14');
+  r.style.setProperty('--surface',  t.Surface ?? t.surface ?? '#13131f');
+  r.style.setProperty('--surface2', t.Surface2 ?? t.surface2 ?? '#1a1a2e');
+  const hx = hex.replace('#','');
+  const rr = parseInt(hx.slice(0,2),16);
+  const gg = parseInt(hx.slice(2,4),16);
+  const bb = parseInt(hx.slice(4,6),16);
+  r.style.setProperty('--border', `rgba(${rr},${gg},${bb},0.2)`);
+  r.style.setProperty('--accent2', hex);
+}
+
+function toast(msg, dur = 2200) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+const docInicial = crearDoc();
+activarDoc(docInicial.id);
+renderTabs();
+renderRecientes();
+window.chrome.webview.postMessage('get:tema');
+window.chrome.webview.postMessage('docs:recientes:cargar');
+</script>
+</body>
+</html>

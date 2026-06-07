@@ -44,6 +44,8 @@ namespace atsukibrowser
             new() { Accion="captura",           Descripcion="Captura de pantalla",     Ctrl=true,  Shift=false, Alt=false, Tecla="P"      },
             new() { Accion="busqueda_rapida",   Descripcion="Búsqueda rápida sidebar", Ctrl=true,  Shift=false, Alt=false, Tecla="K"      },
             new() { Accion="musica_play",       Descripcion="Play/Pause música",       Ctrl=false, Shift=false, Alt=false, Tecla="MediaPlayPause" },
+            new() { Accion="pip", Descripcion="Picture-in-Picture", Ctrl=true, Shift=true, Alt=false, Tecla="P" },
+            new() { Accion="modo_zen", Descripcion="Modo Zen", Ctrl=true, Shift=true, Alt=false, Tecla="Z"},
         };
 
         public AtajosManager(string carpeta)

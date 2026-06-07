@@ -856,6 +856,44 @@
 
 
   <img id="bg-image" alt="" />
+  <!-- Botón apps estilo Google -->
+  <div id="apps-btn" style="
+    position: fixed; top: 14px; right: 72px; z-index: 10;
+    width: 48px; height: 48px; border-radius: 50%;
+    background: rgba(13,13,20,0.7); backdrop-filter: blur(8px);
+    border: 2px solid rgba(124,58,237,0.35); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: border-color 0.2s, transform 0.2s;
+    user-select: none;
+  " onmouseenter="this.style.borderColor='rgba(124,58,237,0.8)';this.style.transform='scale(1.05)'"
+    onmouseleave="this.style.borderColor='rgba(124,58,237,0.35)';this.style.transform='scale(1)'">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <circle cx="5"  cy="5"  r="2" fill="rgba(255,255,255,0.6)"/>
+      <circle cx="12" cy="5"  r="2" fill="rgba(255,255,255,0.6)"/>
+      <circle cx="19" cy="5"  r="2" fill="rgba(255,255,255,0.6)"/>
+      <circle cx="5"  cy="12" r="2" fill="rgba(255,255,255,0.6)"/>
+      <circle cx="12" cy="12" r="2" fill="rgba(255,255,255,0.6)"/>
+      <circle cx="19" cy="12" r="2" fill="rgba(255,255,255,0.6)"/>
+      <circle cx="5"  cy="19" r="2" fill="rgba(255,255,255,0.6)"/>
+      <circle cx="12" cy="19" r="2" fill="rgba(255,255,255,0.6)"/>
+      <circle cx="19" cy="19" r="2" fill="rgba(255,255,255,0.6)"/>
+    </svg>
+  </div>
+
+  <!-- Panel de apps -->
+  <div id="apps-panel" style="
+    display:none; position:fixed; top:70px; right:72px; z-index:100;
+    width:200px; background:rgba(10,10,20,0.95); backdrop-filter:blur(20px);
+    border:1px solid rgba(124,58,237,0.35); border-radius:12px;
+    padding:12px; box-shadow:0 20px 60px rgba(0,0,0,0.6);
+    font-family:'Segoe UI',sans-serif;
+  ">
+    <div style="font-size:10px;color:rgba(255,255,255,0.35);margin-bottom:10px;text-align:center;letter-spacing:1px;">APPS</div>
+    <div id="apps-grid" style="
+      display:grid; grid-template-columns: repeat(3, 1fr); gap:8px;
+    "></div>
+  </div>
+
   <div id="perfil-badge" style="
     position: fixed; top: 14px; right: 16px; z-index: 10;
     width: 48px; height: 48px; border-radius: 50%;
@@ -1419,7 +1457,12 @@
         </div>
         <span>${d.nombre}</span>`;
 
-      el.addEventListener('click', () => { window.location.href = d.url; });
+      el.addEventListener('click', () => {
+        if (d.url.startsWith('navigate:') || d.url.startsWith('atsuki://'))
+          window.chrome.webview.postMessage(d.url);
+        else
+          window.chrome.webview.postMessage('navigate:' + d.url);
+      });
       el.addEventListener('contextmenu', ev => { ev.preventDefault(); ctxIndex = i; mostrarCtx(ev.clientX, ev.clientY); });
       c.appendChild(el);
     });
@@ -1893,20 +1936,35 @@
 
     if (!emptyMsg || !playerInner || !playBtn) return;
 
-    let estadoActual = { playing: false };
+    // Estado global accesible desde los botones siempre
+    window._musicaEstado = { playing: false, fuente: '' };
 
     function aplicarMusica(m) {
       if (!m || !m.titulo) {
         emptyMsg.style.display = '';
         playerInner.style.display = 'none';
         if (bg) bg.style.backgroundImage = '';
-        estadoActual = { playing: false };
+        window._musicaEstado = { playing: false, fuente: '' };
         return;
       }
 
+      // Si llega un mensaje del SMTC y el player interno está pausado, permitirlo
+      // pero solo si el SMTC tiene algo reproduciéndose activamente
+      if (window._musicaEstado.fuente === 'AtsukiBrowser Music' &&
+          m.fuente !== 'AtsukiBrowser Music') {
+          // Solo bloquear si el player interno está reproduciendo
+          if (window._musicaEstado.playing) return;
+          // Si está pausado y el SMTC no tiene nada activo, mantener el player interno
+          if (!m.playing && !m.titulo) return;
+          // Si está pausado y el SMTC tampoco está reproduciendo, mantener el player interno
+          if (!m.playing) return;
+          // El SMTC está reproduciendo y el player interno está pausado — ceder
+      }
+
+      window._musicaEstado = m;
+
       emptyMsg.style.display = 'none';
       playerInner.style.display = 'flex';
-      estadoActual = m;
 
       if (titulo)   titulo.textContent   = m.titulo  || 'Sin título';
       if (artista)  artista.textContent  = m.artista || '';
@@ -1914,11 +1972,12 @@
       if (bar)      bar.style.width      = (m.progress || 0) + '%';
       playBtn.textContent = m.playing ? '⏸' : '▶';
 
-      if (m.imagen && img) {
-        img.src = m.imagen;
+      const imagenFinal = m.imagen || m.playlistImagen || '';
+      if (imagenFinal && img) {
+        img.src = imagenFinal;
         img.style.display = 'block';
         img.className = m.playing ? 'playing' : '';
-        if (bg) bg.style.backgroundImage = `url('${m.imagen}')`;
+        if (bg) bg.style.backgroundImage = `url('${imagenFinal}')`;
       } else if (img) {
         img.style.display = 'none';
         img.className = '';
@@ -1932,25 +1991,35 @@
       try { aplicarMusica(JSON.parse(raw.slice('musica:'.length))); } catch { }
     });
 
-    // Play/pause — actualizar ícono inmediatamente sin esperar respuesta
     playBtn.addEventListener('click', () => {
-      const ahoraPlaying = !estadoActual.playing;
+      const estado = window._musicaEstado;
+      const ahoraPlaying = !estado.playing;
       playBtn.textContent = ahoraPlaying ? '⏸' : '▶';
       if (img) img.className = ahoraPlaying ? 'playing' : '';
-      estadoActual.playing = ahoraPlaying;
-      window.chrome.webview.postMessage('musica:play');
+      window._musicaEstado.playing = ahoraPlaying;
+
+      if (estado.fuente === 'AtsukiBrowser Music') {
+        window.chrome.webview.postMessage(
+          'atsukimusic:player:' + (ahoraPlaying ? 'play' : 'pause'));
+      } else {
+        window.chrome.webview.postMessage('musica:play');
+      }
     });
 
-    // Anterior/siguiente — feedback visual breve
     document.getElementById('musica-prev')?.addEventListener('click', () => {
-      window.chrome.webview.postMessage('musica:anterior');
+      if (window._musicaEstado.fuente === 'AtsukiBrowser Music')
+        window.chrome.webview.postMessage('atsukimusic:player:anterior');
+      else
+        window.chrome.webview.postMessage('musica:anterior');
     });
 
     document.getElementById('musica-next')?.addEventListener('click', () => {
-      window.chrome.webview.postMessage('musica:siguiente');
+      if (window._musicaEstado.fuente === 'AtsukiBrowser Music')
+        window.chrome.webview.postMessage('atsukimusic:player:siguiente');
+      else
+        window.chrome.webview.postMessage('musica:siguiente');
     });
 
-    // Solo pedir estado al cargar — las actualizaciones llegan por eventos
     window.chrome.webview.postMessage('get:musica');
   });
 
@@ -2307,6 +2376,52 @@
       });
     });
   })();
+
+  // ── Apps panel ──
+  const appsBtn   = document.getElementById('apps-btn');
+  const appsPanel = document.getElementById('apps-panel');
+  const appsGrid  = document.getElementById('apps-grid');
+
+  const APPS = [
+    { nombre: 'Capturas', emoji: '📸', url: 'navigate:capturas' },
+    { nombre: 'Historial', emoji: '🕐', url: 'navigate:historial'  },
+    { nombre: 'Descargas', emoji: '📥', url: 'navigate:descargas'  },
+    { nombre: 'Favoritos', emoji: '⭐', url: 'navigate:favoritos'  },
+    { nombre: 'Ajustes',   emoji: '⚙️', url: 'navigate:ajustes'    },
+    { nombre: 'Docs',     emoji: '📝', url: 'navigate:docs'      },
+    { nombre: 'Notes',     emoji: '📝', url: 'navigate:notes'      },
+  ];
+
+  APPS.forEach(app => {
+    const item = document.createElement('div');
+    item.style.cssText = `
+      display:flex; flex-direction:column; align-items:center; gap:4px;
+      padding:8px 4px; border-radius:8px; cursor:pointer;
+      transition: background 0.15s;
+    `;
+    item.onmouseenter = () => item.style.background = 'rgba(124,58,237,0.15)';
+    item.onmouseleave = () => item.style.background = 'transparent';
+    item.innerHTML = `
+      <span style="font-size:22px">${app.emoji}</span>
+      <span style="font-size:9px;color:rgba(255,255,255,0.5);text-align:center">${app.nombre}</span>
+    `;
+    item.onclick = () => {
+      appsPanel.style.display = 'none';
+      window.chrome.webview.postMessage(app.url);
+    };
+    appsGrid.appendChild(item);
+  });
+
+  appsBtn.onclick = (e) => {
+    e.stopPropagation();
+    const visible = appsPanel.style.display !== 'none';
+    appsPanel.style.display = visible ? 'none' : 'block';
+  };
+
+  document.addEventListener('click', (e) => {
+    if (!appsPanel.contains(e.target) && e.target !== appsBtn)
+      appsPanel.style.display = 'none';
+  });
 </script>
   <div id="search-suggestions"></div>
 </body>

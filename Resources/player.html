@@ -3,8 +3,12 @@
 <head>
 <meta charset="UTF-8">
 </head>
-<body>
-<audio id="audio" preload="auto"></audio>
+<body style="margin:0;padding:0;background:transparent;overflow:hidden;">
+<audio id="audio" preload="auto" crossorigin="anonymous"></audio>
+<iframe id="ytFrame" 
+        style="position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;"
+        allow="autoplay; encrypted-media"
+        frameborder="0"></iframe>
 <script>
 (function() {
     const audio = document.getElementById('audio');
@@ -14,6 +18,7 @@
     let shuffle = false;
     let repeat = 'none';
     let volumen = 0.8;
+    let crossfadeSeg = 0;
     let shuffleOrder = [];
 
     audio.volume = volumen;
@@ -40,23 +45,32 @@
 
     function cancionActual() { return canciones()[indice] ?? null; }
 
+    // Rastrear qué playlist/índice está sonando realmente
+    let playlistSonando = 0;
+    let indiceSonando = 0;
+
+    function cancionSonando() {
+        return playlists[playlistSonando]?.canciones[indiceSonando] ?? null;
+    }
+
     function enviarEstado() {
-        const cancion = cancionActual();
+        const cancion = cancionSonando();
+        const plSonando = playlists[playlistSonando];
         window.chrome.webview.postMessage('musica:estado:' + JSON.stringify({
             reproduciendo: !audio.paused,
             titulo:  cancion?.titulo  ?? '',
             autor:   cancion?.autor   ?? '',
             imagen:  cancion?.imagen  ?? '',
-            indice,
-            total: canciones().length,
+            indice:  indiceSonando,
+            total:   plSonando?.canciones.length ?? 0,
             volumen,
             shuffle,
             repeat,
             progreso: audio.currentTime,
             duracion: audio.duration || 0,
             playlistActiva,
-            playlistNombre: playlist().nombre,
-            playlistImagen: playlist().imagen ?? ''
+            playlistNombre: plSonando?.nombre ?? '',
+            playlistImagen: plSonando?.imagen ?? ''
         }));
     }
 
@@ -69,18 +83,50 @@
     function cargarYReproducir(idx) {
         if (canciones().length === 0) return;
         indice = idx;
+        indiceSonando = idx;
+        playlistSonando = playlistActiva;
         const cancion = cancionActual();
         if (!cancion) return;
+
         audio.oncanplay = null;
+        audio.oncanplaythrough = null;
         audio.pause();
-        audio.src = cancion.url;
+
         window.chrome.webview.postMessage('musica:notify:' + cancion.titulo + '|' + (cancion.imagen || playlist().imagen || ''));
-        audio.load();
-        audio.oncanplay = () => {
+
+        let intentos = 0;
+        const maxIntentos = 5;
+        const delayEntreIntentos = 2000;
+
+        function intentarCargar() {
+            audio.src = cancion.url;
+            audio.load();
             audio.oncanplay = null;
-            audio.play().catch(err =>
-                window.chrome.webview.postMessage('musica:notify:ERROR: ' + err.message + '|'));
-        };
+            audio.oncanplaythrough = null;
+
+            const intentarPlay = () => {
+                audio.oncanplay = null;
+                audio.oncanplaythrough = null;
+                audio.play().catch(err =>
+                    window.chrome.webview.postMessage('musica:notify:ERROR play: ' + err.message + '|'));
+            };
+
+            audio.oncanplay = intentarPlay;
+
+            // Si en delayEntreIntentos ms no cargó, reintentar
+            setTimeout(() => {
+                if (audio.paused && (audio.readyState < 3)) {
+                    intentos++;
+                    if (intentos < maxIntentos) {
+                        intentarCargar();
+                    } else {
+                        window.chrome.webview.postMessage('musica:notify:❌ No se pudo cargar el stream|');
+                    }
+                }
+            }, delayEntreIntentos);
+        }
+
+        intentarCargar();
         enviarEstado();
     }
 
@@ -90,7 +136,7 @@
         cargarYReproducir(idx);
     }
 
-    function siguiente() {
+    function siguiente(manual = false) {
         if (canciones().length === 0) return;
         if (repeat === 'one') { audio.currentTime = 0; audio.play().catch(() => {}); return; }
         if (shuffle) {
@@ -98,7 +144,11 @@
             cargarYReproducir(shuffleOrder[(idx + 1) % shuffleOrder.length]);
         } else {
             const next = (indice + 1) % canciones().length;
-            if (next === 0 && repeat === 'none') { audio.pause(); enviarEstado(); return; }
+            if (next === 0 && repeat === 'none' && !manual) { 
+                audio.pause(); 
+                enviarEstado(); 
+                return; 
+            }
             cargarYReproducir(next);
         }
     }
@@ -114,7 +164,7 @@
         }
     }
 
-    audio.addEventListener('ended', siguiente);
+    audio.addEventListener('ended', () => siguiente(false));
     audio.addEventListener('timeupdate', () => {
         if (Math.floor(audio.currentTime) % 2 === 0) enviarEstado();
     });
@@ -140,7 +190,7 @@
         } else if (msg === 'player:pause') {
             audio.pause();
         } else if (msg === 'player:siguiente') {
-            siguiente();
+            siguiente(true);
         } else if (msg === 'player:anterior') {
             anterior();
         } else if (msg === 'player:aleatorio') {
@@ -157,18 +207,45 @@
             repeat = msg.slice('player:repeat:'.length);
             enviarEstado();
         } else if (msg.startsWith('player:playlists:')) {
-            // Recibe el array completo de playlists
-            playlists = JSON.parse(msg.slice('player:playlists:'.length));
-            indice = 0;
+            const nuevas = JSON.parse(msg.slice('player:playlists:'.length));
+
+            // Guardar estado actual antes de actualizar
+            const playlistActivaAntes = playlistActiva;
+            const tituloActual = cancionActual()?.titulo ?? '';
+            const estaReproduciendo = !audio.paused;
+
+            playlists = nuevas;
+
+            // Restaurar playlist activa si sigue existiendo
+            if (playlistActivaAntes < playlists.length)
+                playlistActiva = playlistActivaAntes;
+            else
+                playlistActiva = 0;
+
+            // Restaurar índice de canción actual
+            if (tituloActual) {
+                const nuevoIdx = canciones().findIndex(c => c.titulo === tituloActual);
+                if (nuevoIdx >= 0) indice = nuevoIdx;
+                else if (indice >= canciones().length) indice = 0;
+            }
+
+            // NO tocar el audio — solo regenerar shuffle si hace falta
             if (shuffle) generarShuffleOrder();
             enviarEstado();
+            enviarPlaylists();
+        } else if (msg.startsWith('player:playlists_silent:')) {
+            // Cargar playlists sin tocar el audio ni reproducir nada
+            const nuevas = JSON.parse(msg.slice('player:playlists_silent:'.length));
+            playlists = nuevas;
+            playlistActiva = 0;
+            indice = 0;
+            if (shuffle) generarShuffleOrder();
             enviarPlaylists();
         } else if (msg.startsWith('player:switchplaylist:')) {
             const idx = parseInt(msg.slice('player:switchplaylist:'.length));
             if (idx >= 0 && idx < playlists.length) {
                 playlistActiva = idx;
-                indice = 0;
-                // NO pausar — solo cambiar el contexto visual, la música sigue
+                // NO resetear indice ni tocar audio — solo cambiar contexto visual
                 if (shuffle) generarShuffleOrder();
                 enviarEstado();
                 enviarPlaylists();
@@ -181,11 +258,74 @@
             enviarPlaylists();
         } else if (msg.startsWith('player:seek:')) {
             audio.currentTime = parseFloat(msg.slice('player:seek:'.length));
+        } else if (msg.startsWith('player:velocidad:')) {
+            const vel = parseFloat(msg.slice('player:velocidad:'.length));
+            if (!isNaN(vel) && vel > 0) {
+                audio.playbackRate = vel;
+                enviarEstado();
+            }
         }
     });
 
     enviarEstado();
     enviarPlaylists();
+
+    // ── Visualizador ──
+    const vizCanvas = document.createElement('canvas');
+    vizCanvas.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;';
+    document.body.appendChild(vizCanvas);
+    const vizCtx = vizCanvas.getContext('2d');
+
+    let audioCtx, analyser, animFrame;
+
+    function iniciarVisualizador() {
+        if (audioCtx) return;
+        try {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioCtx.createAnalyser();
+            analyser.fftSize = 64;
+            const source = audioCtx.createMediaElementSource(audio);
+            source.connect(analyser);
+            analyser.connect(audioCtx.destination);
+        } catch(e) {}
+    }
+
+    function dibujarViz() {
+        if (!analyser) return;
+        animFrame = requestAnimationFrame(dibujarViz);
+
+        const W = vizCanvas.width  = vizCanvas.offsetWidth;
+        const H = vizCanvas.height = vizCanvas.offsetHeight;
+        vizCtx.clearRect(0, 0, W, H);
+
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+
+        const count = Math.min(data.length, 28);
+        const gap   = 2;
+        const barW  = (W / count) - gap;
+
+        for (let i = 0; i < count; i++) {
+            const v  = data[i] / 255;
+            const bH = Math.max(2, v * H);
+            const r  = 124 + Math.round(v * 80);
+            const g  = 58  + Math.round(v * 20);
+            vizCtx.fillStyle = `rgba(${r},${g},237,0.85)`;
+            vizCtx.beginPath();
+            vizCtx.roundRect(i * (barW + gap), H - bH, barW, bH, 2);
+            vizCtx.fill();
+        }
+    }
+
+    audio.addEventListener('play', () => {
+        iniciarVisualizador();
+        if (audioCtx?.state === 'suspended') audioCtx.resume();
+        cancelAnimationFrame(animFrame);
+        dibujarViz();
+    });
+
+    audio.addEventListener('pause', () => cancelAnimationFrame(animFrame));
+    audio.addEventListener('ended', () => cancelAnimationFrame(animFrame));
 })();
 </script>
 </body>

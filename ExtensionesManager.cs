@@ -277,88 +277,146 @@ namespace atsukibrowser
 
         // ── Script del bloqueador de anuncios ────────────────
         private const string AdblockScript = """
-(function() {
-    const SELECTORS = [
-        // Genéricos
-        '[id^="ad-"],[id^="ads-"],[class^="ad-"],[class^="ads-"]',
-        '#header-banner, .masthead-ad-control',
-        '[class*="sponsor"],[id*="sponsor"]',
-        '[class*="promo"],[id*="promo"]',
-        '[class*="advertisement"],[id*="advertisement"]',
-        '[class*="advert"],[id*="advert"]',
-        '[data-ad],[data-ads],[data-advertisement]',
-        'ins.adsbygoogle',
-        '#google_ads_frame',
+        (function() {
+            // No correr en páginas internas
+            const host = location.hostname;
+            if (!host || host === '' || location.protocol === 'file:') return;
 
-        // YouTube
-        '.ytp-ad-module',
-        '.ytd-ad-slot-renderer',
-        'ytd-promoted-sparkles-web-renderer',
-        'ytd-banner-promo-renderer',
-        '#masthead-ad',
-        'ytd-statement-banner-renderer',
-        'ytd-in-feed-ad-layout-renderer',
-        '.ytd-display-ad-renderer',
+            // ── Selectores seguros (alta precisión, bajo riesgo de falsos positivos) ──
+            const SELECTORS_CSS = [
+                // Estándar de industria
+                'ins.adsbygoogle',
+                '#google_ads_frame',
+                'iframe[src*="doubleclick.net"]',
+                'iframe[src*="googlesyndication.com"]',
+                'iframe[src*="adnxs.com"]',
+                'iframe[src*="amazon-adsystem.com"]',
+                'iframe[src*="ads.youtube.com"]',
+                '[id="google_ads_iframe_0"]',
 
-        // Twitch
-        '.tw-ad-unit',
-        '[data-a-target="tw-ad"]',
+                // YouTube — específicos y seguros
+                '.ytp-ad-module',
+                '.ytp-ad-overlay-container',
+                '.ytp-ad-skip-button-container',
+                'ytd-promoted-sparkles-web-renderer',
+                'ytd-banner-promo-renderer',
+                '#masthead-ad',
+                'ytd-statement-banner-renderer',
+                'ytd-in-feed-ad-layout-renderer',
+                'ytd-ad-slot-renderer',
 
-        // Reddit
-        '.promotedlink',
-        'shreddit-ad-post',
+                // ── Saltar anuncios de video de YouTube ─────────────
+                function saltarAnunciosYT() {
+                    // Botón de saltar
+                    const skipBtn = document.querySelector('.ytp-skip-ad-button, .ytp-ad-skip-button');
+                    if (skipBtn) { skipBtn.click(); return; }
 
-        // Genérico tracking / popups
-        '[class*="popup"],[id*="popup"]',
-        '[class*="overlay"][class*="ad"]',
-        'iframe[src*="doubleclick"]',
-        'iframe[src*="googlesyndication"]',
-        'iframe[src*="adnxs"]',
-        'iframe[src*="amazon-adsystem"]',
-    ];
+                    // Si hay anuncio reproduciéndose, avanzar al final
+                    const video = document.querySelector('video');
+                    const adBadge = document.querySelector('.ad-showing, .ytp-ad-player-overlay');
+                    if (video && adBadge) {
+                        if (!isNaN(video.duration) && video.duration > 0) {
+                            video.currentTime = video.duration;
+                            video.muted = false;
+                        }
+                    }
+                }
 
-    function bloquear() {
-        const style = document.getElementById('__atsuki_adblock__');
-        if (style) return;
+                // Sidebar/banner de YouTube
+                const YT_EXTRA = [
+                    '#player-ads',
+                    '.ytd-promoted-video-renderer',
+                    'ytd-companion-slot-renderer',
+                    'ytd-action-companion-ad-renderer',
+                    '#watch-sidebar .ytd-watch-next-secondary-results-renderer > ytd-compact-promoted-item-renderer',
+                    'ytd-promoted-sparkles-text-search-renderer',
+                    '.ytp-ce-element',          // cards de anuncios sobre el video
+                    '.ytp-suggested-action',    // botones sugeridos de anuncio
+                ].join(',\n');
 
-        const css = SELECTORS.join(',\n') + ' { display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; height: 0 !important; min-height: 0 !important; }';
+                // Inyectar en CSS junto a los otros
+                el.textContent += '\n' + YT_EXTRA + ' { display: none !important; }';
 
-        const el = document.createElement('style');
-        el.id = '__atsuki_adblock__';
-        el.textContent = css;
-        (document.head || document.documentElement).appendChild(el);
-    }
+                // Correr el salto cada 500ms
+                setInterval(saltarAnunciosYT, 500);
 
-    // Aplicar inmediatamente y al cargar el DOM
-    bloquear();
-    document.addEventListener('DOMContentLoaded', bloquear);
+                // Twitch
+                '.tw-ad-unit',
+                '[data-a-target="tw-ad-unit"]',
 
-    // Observer para elementos añadidos dinámicamente
-    let _timer = null;
-    const observer = new MutationObserver(() => {
-        if (_timer) return;
-        _timer = setTimeout(() => {
-            _timer = null;
-            SELECTORS.forEach(sel => {
-                try {
-                    document.querySelectorAll(sel).forEach(el => {
-                        el.style.cssText = 'display:none!important;height:0!important;';
-                    });
-                } catch {}
+                // Reddit
+                'shreddit-ad-post',
+                '[data-testid="post-container"][data-promoted="true"]',
+
+                // Twitter/X
+                '[data-testid="placementTracking"]',
+
+                // Tracking pixels
+                'img[src*="doubleclick.net"]',
+                'img[src*="googletagmanager.com"]',
+                'img[src*="facebook.com/tr"]',
+                'img[width="1"][height="1"]',
+                'img[width="0"][height="0"]',
+            ];
+
+            // ── Selectores que requieren verificación extra ──
+            // Solo se aplican si el elemento NO tiene contenido interactivo relevante
+            const SELECTORS_CUIDADOSOS = [
+                '[id^="div-gpt-ad"]',
+                '[id^="ad-slot-"]',
+                '[id^="dfp-ad-"]',
+                '[class~="adsbygoogle"]',
+            ];
+
+            function inyectarCSS() {
+                if (document.getElementById('__atsuki_adblock__')) return;
+                const el = document.createElement('style');
+                el.id = '__atsuki_adblock__';
+                el.textContent = SELECTORS_CSS.join(',\n') + ` {
+                    display: none !important;
+                    visibility: hidden !important;
+                    pointer-events: none !important;
+                }`;
+                (document.head || document.documentElement).appendChild(el);
+            }
+
+            function bloquearCuidadosos() {
+                SELECTORS_CUIDADOSOS.forEach(sel => {
+                    try {
+                        document.querySelectorAll(sel).forEach(el => {
+                            // No ocultar si contiene un formulario, input, o botón importante
+                            if (el.querySelector('input, button, form, video, a[href]:not([href="#"])')) return;
+                            // No ocultar si tiene texto largo (probablemente contenido real)
+                            if ((el.textContent?.trim().length ?? 0) > 200) return;
+                            el.style.cssText = 'display:none!important;';
+                        });
+                    } catch {}
+                });
+            }
+
+            // Aplicar inmediatamente
+            inyectarCSS();
+
+            document.addEventListener('DOMContentLoaded', () => {
+                inyectarCSS();
+                bloquearCuidadosos();
             });
-        }, 300);
-    });
 
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
+            // Observer con debounce para elementos dinámicos
+            let _timer = null;
+            const observer = new MutationObserver(() => {
+                if (_timer) return;
+                _timer = setTimeout(() => {
+                    _timer = null;
+                    bloquearCuidadosos();
+                }, 500);
+            });
 
-    observer.observe(document.documentElement, {
-        childList: true,
-        subtree: true
-    });
-})();
-""";
+            observer.observe(document.documentElement, {
+                childList: true,
+                subtree: true
+            });
+        })();
+        """;
     }
 }

@@ -39,6 +39,59 @@
         </Setter>
     </Style>
     <local:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+    <!-- Scrollbar estilo minimalista oscuro -->
+    <Style TargetType="ScrollBar">
+        <Setter Property="Width" Value="6"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Grid x:Name="Bg" Background="Transparent">
+                        <Track x:Name="PART_Track" IsDirectionReversed="True">
+                            <Track.Thumb>
+                                <Thumb>
+                                    <Thumb.Template>
+                                        <ControlTemplate TargetType="Thumb">
+                                            <Border x:Name="ThumbBorder"
+                                                    Background="#3a2a6a"
+                                                    CornerRadius="3"
+                                                    Margin="1,2"/>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="ThumbBorder" Property="Background" Value="#7c3aed"/>
+                                                </Trigger>
+                                                <Trigger Property="IsDragging" Value="True">
+                                                    <Setter TargetName="ThumbBorder" Property="Background" Value="#9d5aff"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Thumb.Template>
+                                </Thumb>
+                            </Track.Thumb>
+                        </Track>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style x:Key="UrlBarStyle" TargetType="TextBox">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="#aaaacc"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Padding" Value="4,0"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="CaretBrush" Value="#7c3aed"/>
+        <Setter Property="ContextMenu" Value="{x:Null}"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <ScrollViewer x:Name="PART_ContentHost"
+                                VerticalAlignment="Center"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </Window.Resources>
 
 <WindowChrome.WindowChrome>
@@ -52,6 +105,7 @@
     <Grid x:Name="MainGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="34"/>
+            <RowDefinition Height="Auto" x:Name="GruposRow" MinHeight="0"/>
             <RowDefinition Height="40"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
@@ -136,8 +190,25 @@
             </StackPanel>
         </Grid>
 
+        <!-- Fila de grupos de tabs -->
+        <Border x:Name="GruposBar" 
+                Grid.Row="1" Grid.ColumnSpan="2"
+                Height="32"
+                Background="#0d0d14"
+                BorderBrush="#1a1030"
+                BorderThickness="0,0,0,1"
+                Visibility="Collapsed">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" 
+                        VerticalScrollBarVisibility="Hidden">
+                <StackPanel x:Name="GruposStrip" 
+                            Orientation="Horizontal" 
+                            VerticalAlignment="Center"
+                            Margin="8,0"/>
+            </ScrollViewer>
+        </Border>
+
         <!-- Barra de navegación (solo columna 1) -->
-        <Grid x:Name="NavBar" Grid.Row="1" Grid.Column="1" Background="#12121C">
+        <Grid x:Name="NavBar" Grid.Row="2" Grid.Column="1" Background="#12121C">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
@@ -205,13 +276,12 @@
 
                     <!-- TextBox editable (visible al enfocar) -->
                     <TextBox Grid.Column="2" x:Name="UrlBar"
-                            Background="Transparent" Foreground="#aaaacc"
-                            BorderThickness="0" VerticalAlignment="Center"
-                            Padding="4,0" FontSize="12" KeyDown="UrlBar_KeyDown"
-                            TextChanged="UrlBar_TextChanged"
-                            GotFocus="UrlBar_GotFocus"
-                            LostFocus="UrlBar_LostFocus"
-                            CaretBrush="#7c3aed"/>
+                        Style="{StaticResource UrlBarStyle}"
+                        KeyDown="UrlBar_KeyDown"
+                        TextChanged="UrlBar_TextChanged"
+                        GotFocus="UrlBar_GotFocus"
+                        LostFocus="UrlBar_LostFocus"
+                        PreviewMouseRightButtonDown="UrlBar_MouseRightButtonDown"/>
 
                     <!-- TextBlock decorado (visible cuando no está en foco) -->
                     <TextBlock x:Name="UrlDisplay" Grid.Column="2"
@@ -232,7 +302,8 @@
                         BorderBrush="#2a1a4a"
                         BorderThickness="1"
                         CornerRadius="0,0,8,8"
-                        MinWidth="400">
+                        MinWidth="400"
+                        Focusable="False">
                     <ListBox x:Name="SugerenciasList"
                             Background="Transparent"
                             BorderThickness="0"
@@ -240,6 +311,7 @@
                             Foreground="White"
                             FontSize="14"
                             Padding="4"
+                            Focusable="False"
                             MouseUp="SugerenciasList_MouseUp"
                             KeyDown="SugerenciasList_KeyDown">
                         <ListBox.ItemContainerStyle>
@@ -499,9 +571,10 @@
         </Grid>
 
         <!-- Sidebar izquierdo (filas 1 y 2, columna 0) -->
-        <Border x:Name="Sidebar" Grid.Row="1" Grid.RowSpan="2" Grid.Column="0"
+        <Border x:Name="Sidebar" Grid.Row="1" Grid.RowSpan="3" Grid.Column="0"
                 Background="#0A0A10"
-                BorderBrush="#1a1030" BorderThickness="0,0,1,0">
+                BorderBrush="#1a1030" BorderThickness="0,0,1,0"
+                ClipToBounds="True">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="52"/>
@@ -520,15 +593,113 @@
                 <Border x:Name="MusicaPanel" Grid.Column="1"
                         Background="#0d0d18"
                         BorderBrush="#1a1030" BorderThickness="1,0,0,0"
-                        Visibility="Collapsed">
+                        Visibility="Collapsed"
+                        ClipToBounds="True">
                     <DockPanel Margin="12">
 
                         <!-- Header -->
-                        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                            <TextBlock Text="Música de fondo"
+                        <Grid DockPanel.Dock="Top" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="Música de fondo"
                                     FontSize="10" FontWeight="Bold"
-                                    Foreground="#7c3aed"/>
-                        </StackPanel>
+                                    Foreground="#7c3aed"
+                                    VerticalAlignment="Center"/>
+                            <Button x:Name="BtnMusicaAjustes" Grid.Column="1"
+                                    Content="⚙" Width="24" Height="24"
+                                    Background="Transparent" BorderThickness="0"
+                                    Foreground="#555577" FontSize="13"
+                                    Cursor="Hand" ToolTip="Ajustes de música"/>
+                        </Grid>
+
+                        <!-- Panel de ajustes de música -->
+                        <Border x:Name="MusicaAjustesPanel" DockPanel.Dock="Top"
+                                Background="#0a0a14" BorderBrush="#2a1a4a"
+                                BorderThickness="1" CornerRadius="6"
+                                Padding="10,8" Margin="0,0,0,8"
+                                Visibility="Collapsed">
+                            <StackPanel>
+                                <!-- Fondo del panel -->
+                                <TextBlock Text="FONDO DEL PANEL" FontSize="9"
+                                        Foreground="#555577"
+                                        Margin="0,0,0,6"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,8" >
+                                    <Button x:Name="BtnMusicaFondoArtwork" Content="Artwork"
+                                            FontSize="10" Padding="6,3" Margin="0,0,4,0"
+                                            Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                            BorderThickness="1" Foreground="#7c3aed"
+                                            Cursor="Hand"/>
+                                    <Button x:Name="BtnMusicaFondoImagen" Content="Imagen"
+                                            FontSize="10" Padding="6,3" Margin="0,0,4,0"
+                                            Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                            BorderThickness="1" Foreground="#555577"
+                                            Cursor="Hand"/>
+                                    <Button x:Name="BtnMusicaFondoNinguno" Content="Ninguno"
+                                            FontSize="10" Padding="6,3"
+                                            Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                            BorderThickness="1" Foreground="#555577"
+                                            Cursor="Hand"/>
+                                </StackPanel>
+
+                                <!-- Reproducir al inicio -->
+                                <TextBlock Text="AL INICIAR" FontSize="9"
+                                        Foreground="#555577"
+                                        Margin="0,0,0,6"/>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Reproducir al abrir"
+                                            FontSize="11" Foreground="#aaaacc"
+                                            VerticalAlignment="Center"/>
+                                    <Button x:Name="BtnMusicaAutoplay" Grid.Column="1"
+                                            Content="○" Width="32" Height="18"
+                                            Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                            BorderThickness="1" Foreground="#555577"
+                                            FontSize="10" Cursor="Hand"/>
+                                </Grid>
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Aleatorio de todas las playlists"
+                                            FontSize="11" Foreground="#aaaacc"
+                                            VerticalAlignment="Center"/>
+                                    <Button x:Name="BtnMusicaAleatorioGlobal" Grid.Column="1"
+                                            Content="○" Width="32" Height="18"
+                                            Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                            BorderThickness="1" Foreground="#555577"
+                                            FontSize="10" Cursor="Hand"/>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,4">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="Reanudar al abrir"
+                                            FontSize="11" Foreground="#aaaacc"
+                                            VerticalAlignment="Center"/>
+                                    <Button x:Name="BtnMusicaContinuar" Grid.Column="1"
+                                            Content="○" Width="32" Height="18"
+                                            Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                            BorderThickness="1" Foreground="#555577"
+                                            FontSize="10" Cursor="Hand"/>
+                                </Grid>
+
+                                <!-- Volumen por defecto -->
+                                <TextBlock Text="VOLUMEN POR DEFECTO" FontSize="9"
+                                        Foreground="#555577"
+                                        Margin="0,4,0,6"/>
+                                <Slider x:Name="MusicaVolumenDefault"
+                                        Minimum="0" Maximum="1" Value="0.8"
+                                        IsMoveToPointEnabled="True"/>
+                            </StackPanel>
+                        </Border>
 
                         <!-- Tabs de playlists -->
                         <ScrollViewer DockPanel.Dock="Top"
@@ -558,6 +729,12 @@
                                         FontSize="12" FontWeight="SemiBold"
                                         Foreground="White"
                                         TextTrimming="CharacterEllipsis"/>
+                                <TextBlock x:Name="MusicaAutor"
+                                        Text=""
+                                        FontSize="10"
+                                        Foreground="#9966cc"
+                                        TextTrimming="CharacterEllipsis"
+                                        Margin="0,2,0,0"/>
                                 <TextBlock x:Name="MusicaInfo"
                                         Text="—"
                                         FontSize="10"
@@ -602,6 +779,29 @@
                                     Foreground="#555577" Margin="4,0,0,0"/>
                         </StackPanel>
 
+                        <!-- Velocidad de reproducción -->
+                        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" 
+                                    Margin="0,0,0,6" HorizontalAlignment="Center">
+                            <TextBlock Text="VELOCIDAD" FontSize="9" Foreground="#555577"
+                                    VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Button x:Name="BtnVel05" Content="0.5x" Tag="0.5"
+                                    FontSize="10" Padding="6,2" Cursor="Hand" Margin="0,0,2,0"
+                                    Background="#1a0a3a" Foreground="#555577"
+                                    BorderBrush="#2a1a4a" BorderThickness="1"/>
+                            <Button x:Name="BtnVel1" Content="1x" Tag="1.0"
+                                    FontSize="10" Padding="6,2" Cursor="Hand" Margin="0,0,2,0"
+                                    Background="#2a1a5a" Foreground="White"
+                                    BorderBrush="#7c3aed" BorderThickness="1"/>
+                            <Button x:Name="BtnVel15" Content="1.5x" Tag="1.5"
+                                    FontSize="10" Padding="6,2" Cursor="Hand" Margin="0,0,2,0"
+                                    Background="#1a0a3a" Foreground="#555577"
+                                    BorderBrush="#2a1a4a" BorderThickness="1"/>
+                            <Button x:Name="BtnVel2" Content="2x" Tag="2.0"
+                                    FontSize="10" Padding="6,2" Cursor="Hand"
+                                    Background="#1a0a3a" Foreground="#555577"
+                                    BorderBrush="#2a1a4a" BorderThickness="1"/>
+                        </StackPanel>
+
                         <!-- Volumen -->
                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,8">
                             <TextBlock Text="🔈" FontSize="11" Foreground="#555577" VerticalAlignment="Center"/>
@@ -612,61 +812,133 @@
                             <TextBlock Text="🔊" FontSize="11" Foreground="#555577" VerticalAlignment="Center"/>
                         </StackPanel>
 
-                        <!-- Header playlist + botones acción -->
-                        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
-                            <TextBlock Text="PLAYLIST" FontSize="10"
-                                    Foreground="#555577" VerticalAlignment="Center"/>
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                                <Button x:Name="BtnMusicaNuevaPlaylist" Content="+ Lista"
-                                        FontSize="10" Padding="5,3" Cursor="Hand" Margin="0,0,4,0"
-                                        Background="#1a0a3a" Foreground="#9955BB"
-                                        BorderBrush="#3D2A6E" BorderThickness="1"/>
-                                <Button x:Name="BtnMusicaAgregarArchivo" Content="+ Archivo"
-                                        FontSize="10" Padding="5,3"
-                                        Background="#1a0a3a" BorderBrush="#2a1a4a"
-                                        BorderThickness="1" Foreground="#7c3aed"
-                                        Cursor="Hand" Margin="0,0,4,0"/>
-                                <Button x:Name="BtnMusicaLimpiar" Content="Limpiar"
-                                        FontSize="10" Padding="5,3"
-                                        Background="#1a0a3a" BorderBrush="#2a1a4a"
-                                        BorderThickness="1" Foreground="#555577"
-                                        Cursor="Hand"/>
-                            </StackPanel>
-                        </DockPanel>
-
-                        <!-- Export / Import -->
+                        <!-- Tabs Canciones / Playlists -->
                         <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
-                            <Button x:Name="BtnMusicaExportar" Content="↑ Exportar"
-                                    FontSize="10" Padding="6,3" Cursor="Hand" Margin="0,0,4,0"
-                                    Background="#1a0a3a" Foreground="#558855"
-                                    BorderBrush="#2A4E2A" BorderThickness="1"/>
-                            <Button x:Name="BtnMusicaImportar" Content="↓ Importar"
-                                    FontSize="10" Padding="6,3" Cursor="Hand"
-                                    Background="#1a0a3a" Foreground="#555588"
-                                    BorderBrush="#2A2A4E" BorderThickness="1"/>
+                            <Button x:Name="BtnTabCanciones"
+                                    Content="Canciones"
+                                    FontSize="10" Padding="10,4" Cursor="Hand"
+                                    Background="#2a1a5a" Foreground="White"
+                                    BorderThickness="0" Margin="0,0,2,0"/>
+                            <Button x:Name="BtnTabPlaylists"
+                                    Content="Playlists"
+                                    FontSize="10" Padding="10,4" Cursor="Hand"
+                                    Background="#1a0a3a" Foreground="#555577"
+                                    BorderThickness="0"/>
                         </StackPanel>
 
-                        <!-- Stream input -->
-                        <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="MusicaStreamInput"
-                                    Grid.Column="0"
-                                    Background="#0d0d18" BorderBrush="#2a1a4a"
-                                    Foreground="White" FontSize="11"
-                                    Padding="6,4" BorderThickness="1"/>
-                            <Button x:Name="BtnMusicaAddStream" Content="+"
-                                    Grid.Column="1" Width="28"
-                                    Background="#1a0a3a" BorderBrush="#2a1a4a"
-                                    BorderThickness="1" Foreground="#7c3aed"
-                                    FontSize="16" Cursor="Hand" Margin="4,0,0,0"/>
-                        </Grid>
+                        <!-- Panel Canciones -->
+                        <DockPanel x:Name="PanelTabCanciones" DockPanel.Dock="Top" LastChildFill="True">
 
-                        <!-- Lista de canciones -->
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel x:Name="MusicaPlaylist"/>
+                            <!-- Header playlist + botones acción -->
+                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                                <TextBlock Text="PLAYLIST" FontSize="10"
+                                        Foreground="#555577" VerticalAlignment="Center"/>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                    <Button x:Name="BtnMusicaNuevaPlaylist" Content="+ Lista"
+                                            FontSize="10" Padding="5,3" Cursor="Hand" Margin="0,0,4,0"
+                                            Background="#1a0a3a" Foreground="#9955BB"
+                                            BorderBrush="#3D2A6E" BorderThickness="1"/>
+                                    <Button x:Name="BtnMusicaAgregarArchivo" Content="+ Archivo"
+                                            FontSize="10" Padding="5,3"
+                                            Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                            BorderThickness="1" Foreground="#7c3aed"
+                                            Cursor="Hand" Margin="0,0,4,0"/>
+                                    <Button x:Name="BtnMusicaLimpiar" Content="Limpiar"
+                                            FontSize="10" Padding="5,3"
+                                            Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                            BorderThickness="1" Foreground="#555577"
+                                            Cursor="Hand"/>
+                                    <Button x:Name="BtnMusicaOrdenar" Content="⇅ Ordenar"
+                                            FontSize="10" Padding="5,3" Cursor="Hand" Margin="0,0,4,0"
+                                            Background="#1a0a3a" Foreground="#555577"
+                                            BorderBrush="#2a1a4a" BorderThickness="1"/>
+                                </StackPanel>
+                            </DockPanel>
+
+                            <!-- Export / Import -->
+                            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,6">
+                                <Button x:Name="BtnMusicaExportar" Content="↑ Exportar"
+                                        FontSize="10" Padding="6,3" Cursor="Hand" Margin="0,0,4,0"
+                                        Background="#1a0a3a" Foreground="#558855"
+                                        BorderBrush="#2A4E2A" BorderThickness="1"/>
+                                <Button x:Name="BtnMusicaImportar" Content="↓ Importar"
+                                        FontSize="10" Padding="6,3" Cursor="Hand" Margin="0,0,4,0"
+                                        Background="#1a0a3a" Foreground="#555588"
+                                        BorderBrush="#2A2A4E" BorderThickness="1"/>
+                                <Button x:Name="BtnMusicaFavoritos" Content="★ Favoritos"
+                                        FontSize="10" Padding="6,3" Cursor="Hand"
+                                        Background="#1a0a3a" Foreground="#555577"
+                                        BorderBrush="#2a1a4a" BorderThickness="1"/>
+                            </StackPanel>
+
+                            <!-- Búsqueda -->
+                            <Grid DockPanel.Dock="Top" Margin="0,0,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid Grid.Column="0">
+                                    <TextBox x:Name="MusicaBusqueda"
+                                            Background="#0d0d18" BorderBrush="#2a1a4a"
+                                            Foreground="White" FontSize="11"
+                                            Padding="6,4" BorderThickness="1"/>
+                                    <TextBlock Text="Buscar en playlist..."
+                                            IsHitTestVisible="False"
+                                            Foreground="#444466" FontSize="11"
+                                            Padding="7,5" VerticalAlignment="Center">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Text, ElementName=MusicaBusqueda}" Value="">
+                                                        <Setter Property="Visibility" Value="Visible"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
+                                </Grid>
+                                <Button x:Name="BtnMusicaBusquedaClear" Content="✕"
+                                        Grid.Column="1" Width="24"
+                                        Background="Transparent" BorderThickness="0"
+                                        Foreground="#555577" FontSize="11"
+                                        Cursor="Hand" Margin="2,0,0,0"
+                                        Visibility="Collapsed"/>
+                            </Grid>
+
+                            <!-- Stream input -->
+                            <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="MusicaStreamInput"
+                                        Grid.Column="0"
+                                        Background="#0d0d18" BorderBrush="#2a1a4a"
+                                        Foreground="White" FontSize="11"
+                                        Padding="6,4" BorderThickness="1"/>
+                                <Button x:Name="BtnMusicaAddStream" Content="+"
+                                        Grid.Column="1" Width="28"
+                                        Background="#1a0a3a" BorderBrush="#2a1a4a"
+                                        BorderThickness="1" Foreground="#7c3aed"
+                                        FontSize="16" Cursor="Hand" Margin="4,0,0,0"/>
+                            </Grid>
+
+                            <!-- Lista de canciones con scroll -->
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                        HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel x:Name="MusicaPlaylist"/>
+                            </ScrollViewer>
+
+                        </DockPanel>
+
+                        <!-- Panel Playlists -->
+                        <ScrollViewer x:Name="PanelTabPlaylists"
+                                    DockPanel.Dock="Top"
+                                    Visibility="Collapsed"
+                                    VerticalScrollBarVisibility="Auto"
+                                    HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel x:Name="MusicaPlaylistsPanel" Margin="0,4,0,0"/>
                         </ScrollViewer>
 
                     </DockPanel>
@@ -676,7 +948,7 @@
 
         <!-- Popup buscador rápido del sidebar -->
         <Popup x:Name="PopupBuscadorSidebar"
-            Grid.Row="1" Grid.RowSpan="2" Grid.Column="0"
+            Grid.Row="1" Grid.RowSpan="3" Grid.Column="0"
             Placement="Right" StaysOpen="True"
             AllowsTransparency="True" PopupAnimation="Fade">
             <Border Background="#1E1E2E" BorderBrush="#3d2a6e"
@@ -732,6 +1004,6 @@
         </Popup>
 
         <!-- Contenedor WebView (fila 2, columna 1) -->
-        <Grid x:Name="BrowserContainer" Grid.Row="2" Grid.Column="1"/>
+        <Grid x:Name="BrowserContainer" Grid.Row="3" Grid.Column="1"/>
     </Grid>
 </Window>

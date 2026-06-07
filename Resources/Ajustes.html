@@ -387,6 +387,9 @@ input[type="range"] {
     <a class="sb-item" href="#" onclick="mostrarSeccion('privacidad'); return false;">
       <span class="sb-icon">🔒</span> Privacidad
     </a>
+    <a class="sb-item" href="#" onclick="mostrarSeccion('general'); return false;">
+      <span class="sb-icon">🏠</span> General
+    </a>
     <a class="sb-item" href="#" onclick="mostrarSeccion('datos'); return false;">
       <span class="sb-icon">💾</span> Datos y respaldo
     </a>
@@ -448,15 +451,71 @@ input[type="range"] {
         <div class="field" style="grid-column: 1 / -1">
           <label>Tipografía</label>
           <select class="font-select" id="s-font">
-            <option value="Segoe UI">Segoe UI (default)</option>
-            <option value="Inter">Inter</option>
-            <option value="JetBrains Mono">JetBrains Mono</option>
-            <option value="Consolas">Consolas</option>
-            <option value="Arial">Arial</option>
-            <option value="Georgia">Georgia</option>
+            <option value="Segoe UI">Segoe UI (sistema)</option>
+            <optgroup label="── Sans-serif ──">
+              <option value="Inter">Inter</option>
+              <option value="Nunito">Nunito</option>
+              <option value="Poppins">Poppins</option>
+              <option value="DM Sans">DM Sans</option>
+              <option value="Outfit">Outfit</option>
+              <option value="Plus Jakarta Sans">Plus Jakarta Sans</option>
+            </optgroup>
+            <optgroup label="── Monospace ──">
+              <option value="JetBrains Mono">JetBrains Mono</option>
+              <option value="Fira Code">Fira Code</option>
+              <option value="Source Code Pro">Source Code Pro</option>
+              <option value="Consolas">Consolas (sistema)</option>
+            </optgroup>
+            <optgroup label="── Display ──">
+              <option value="Orbitron">Orbitron</option>
+              <option value="Rajdhani">Rajdhani</option>
+              <option value="Oxanium">Oxanium</option>
+              <option value="Exo 2">Exo 2</option>
+            </optgroup>
+            <optgroup label="── Serif ──">
+              <option value="Lora">Lora</option>
+              <option value="Playfair Display">Playfair Display</option>
+              <option value="Georgia">Georgia (sistema)</option>
+            </optgroup>
           </select>
+          <div id="font-preview" style="
+            margin-top:10px; padding:10px 14px;
+            background:var(--surface2); border:1px solid var(--border);
+            border-radius:8px; font-size:15px; color:var(--text);
+            transition: font-family 0.2s;
+          ">AtsukiBrowser — The quick brown fox</div>
         </div>
         <button class="btn-aplicar" onclick="aplicarCustom()">Aplicar tema personalizado</button>
+      </div>
+      <!-- Opciones de UI -->
+      <div class="section-title" style="margin-top:24px">Interfaz</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Animaciones</div>
+            <div class="perf-desc">Desactiva transiciones y efectos de movimiento</div>
+          </div>
+          <button class="sb-widget-toggle on" id="toggle-animaciones"></button>
+        </div>
+
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Densidad de la UI</div>
+            <div class="perf-desc">Compacto ocupa menos espacio vertical</div>
+          </div>
+          <select id="sel-densidad" style="
+            background:var(--surface2); border:1px solid var(--border);
+            border-radius:6px; padding:5px 10px; color:var(--text);
+            font-size:12px; cursor:pointer; outline:none;
+            font-family:var(--font);
+          ">
+            <option value="normal">Normal</option>
+            <option value="compacto">Compacto</option>
+            <option value="espacioso">Espacioso</option>
+          </select>
+        </div>
+
       </div>
       <div id="preview-wrap">
         <div id="preview-label">Vista previa</div>
@@ -592,20 +651,35 @@ input[type="range"] {
             <div class="perf-desc">Congela tabs en segundo plano para liberar CPU y RAM</div>
           </div>
           <button class="sb-widget-toggle on" data-perf="suspender_tabs"></button>
-          <div class="perf-row">
+        </div>
+        <div id="intervalo-suspension-wrap" style="padding:10px 14px;
+          background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+          <label style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">
+            Suspender después de: <span id="intervalo-val">5</span> minutos
+          </label>
+          <input type="range" id="slider-intervalo" min="1" max="30" value="5" style="margin-top:8px"/>
+        </div>
+        <div class="perf-row">
             <div>
               <div class="perf-label">Pausar media en pestañas inactivas</div>
               <div class="perf-desc">Pausa videos y audio al cambiar de pestaña (desactiva para el widget de música)</div>
             </div>
             <button class="sb-widget-toggle on" data-perf="suspender_media"></button>
-          </div>
         </div>
         <div class="perf-row">
           <div>
             <div class="perf-label">Liberar caché periódicamente</div>
-            <div class="perf-desc">Limpia la caché de WebView2 cada 30 minutos</div>
+            <div class="perf-desc">Limpia la caché de WebView2 automáticamente</div>
           </div>
-          <button class="sb-widget-toggle" data-perf="limpiar_cache"></button>
+          <button class="sb-widget-toggle on" data-perf="limpiar_cache"></button>
+        </div>
+        <div id="intervalo-cache-wrap" style="padding:10px 14px;
+          background:var(--surface2); border:1px solid var(--border); border-radius:8px;">
+          <label style="font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:0.05em;">
+            Limpiar cada: <span id="intervalo-cache-val">30</span> minutos
+          </label>
+          <input type="range" id="slider-intervalo-cache" min="5" max="120" step="5" value="30"
+                style="margin-top:8px"/>
         </div>
         <div class="perf-row">
           <div>
@@ -620,13 +694,6 @@ input[type="range"] {
             Máximo de pestañas: <span id="limite-tabs-val">10</span>
           </label>
           <input type="range" id="slider-limite-tabs" min="3" max="20" value="10" style="margin-top:8px"/>
-        </div>
-        <div class="perf-row">
-          <div>
-            <div class="perf-label">No restaurar tabs al iniciar</div>
-            <div class="perf-desc">Abre siempre una sola pestaña nueva al iniciar el navegador</div>
-          </div>
-          <button class="sb-widget-toggle" data-perf="no_restaurar"></button>
         </div>
       </div>
     </div>
@@ -683,6 +750,56 @@ input[type="range"] {
           style="margin-top:8px; width:fit-content">
           🗑 Borrar historial ahora
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── General ── -->
+  <div id="seccion-general" style="display:none">
+    <div>
+      <h2 style="font-size:22px; font-weight:300; color:white; margin-bottom:8px">
+        Ajustes — <span style="color:var(--accent)">General</span>
+      </h2>
+      <p style="font-size:13px; color:var(--muted); margin-bottom:28px">
+        Comportamiento general del navegador</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Al iniciar</div>
+      <div style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;">
+        <label class="radio-row">
+          <input type="radio" name="inicio" value="nuevatab" checked>
+          Abrir nueva pestaña
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="inicio" value="restaurar">
+          Restaurar pestañas de la última sesión
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="inicio" value="personalizada">
+          Abrir página específica
+        </label>
+      </div>
+      <div id="inicio-url-wrap" style="display:none; margin-top:8px;">
+        <input type="text" id="inicio-url" placeholder="https://ejemplo.com"
+          style="width:100%; background:var(--surface2); border:1px solid var(--border);
+          border-radius:8px; padding:8px 12px; color:var(--text); font-size:13px;
+          font-family:var(--font); outline:none;"/>
+        <button onclick="guardarInicio()" style="
+          margin-top:8px; background:var(--accent); color:white; border:none;
+          border-radius:8px; padding:8px 18px; font-size:12px; cursor:pointer;
+          font-family:var(--font);">Guardar</button>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Confirmaciones</div>
+      <div class="perf-row">
+        <div>
+          <div class="perf-label">Confirmar al cerrar con múltiples pestañas</div>
+          <div class="perf-desc">Pregunta antes de cerrar si hay más de una pestaña abierta</div>
+        </div>
+        <button class="sb-widget-toggle" id="toggle-confirmar-cerrar"></button>
       </div>
     </div>
   </div>
@@ -776,23 +893,36 @@ input[type="range"] {
         </label>
       </div>
 
-      <!-- Card estado -->
+      <!-- Card estado — canal estable -->
       <div id="update-estado" style="display:none; border-radius:12px; padding:20px 24px;
-                                      border:1px solid var(--border); background:var(--surface2);">
+                                      border:1px solid var(--border); background:var(--surface2);
+                                      margin-bottom:10px;">
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.08em;
+                    color:var(--muted); margin-bottom:8px;">Stable</div>
         <div id="update-titulo" style="font-size:14px; font-weight:600;
                                         margin-bottom:8px; color:var(--text);"></div>
         <div id="update-notas" style="font-size:12px; color:var(--muted);
-                                      margin-bottom:16px; white-space:pre-line;
-                                      line-height:1.6;"></div>
-        <button id="update-btn"
-                style="display:none; background:var(--accent); color:white;
-                      border:none; border-radius:8px; padding:10px 20px;
-                      font-size:12px; font-weight:500; cursor:pointer;
-                      font-family:var(--font); letter-spacing:0.02em;
-                      transition: opacity 0.15s;"
-                onmouseover="this.style.opacity='0.85'"
-                onmouseout="this.style.opacity='1'">
+                                        margin-bottom:12px; line-height:1.6;"></div>
+        <button id="update-btn" style="display:none; background:var(--accent); color:white;
+                border:none; border-radius:8px; padding:8px 18px; font-size:12px;
+                cursor:pointer; font-family:var(--font);">
           Actualizar ahora
+        </button>
+      </div>
+
+      <!-- Card estado — canal preview (solo visible en versiones preview) -->
+      <div id="update-estado-preview" style="display:none; border-radius:12px; padding:20px 24px;
+                                              border:1px solid var(--border); background:var(--surface2);">
+        <div style="font-size:10px; text-transform:uppercase; letter-spacing:0.08em;
+                    color:var(--muted); margin-bottom:8px;">Preview</div>
+        <div id="update-titulo-preview" style="font-size:14px; font-weight:600;
+                                                margin-bottom:8px; color:var(--text);"></div>
+        <div id="update-notas-preview" style="font-size:12px; color:var(--muted);
+                                                margin-bottom:12px; line-height:1.6;"></div>
+        <button id="update-btn-preview" style="display:none; background:rgba(124,58,237,0.8);
+                color:white; border:none; border-radius:8px; padding:8px 18px; font-size:12px;
+                cursor:pointer; font-family:var(--font);">
+          Instalar preview
         </button>
       </div>
     </div>
@@ -1328,8 +1458,9 @@ input[type="range"] {
     limpiar_cache:    true,
     limite_tabs:      false,
     limite_tabs_n:    10,
-    no_restaurar:     false,
-    suspender_media:  true
+    suspender_media:  true,
+    intervalo_suspension: 5,
+    intervalo_cache:     30
   };
 
   function aplicarPerfUI() {
@@ -1342,21 +1473,22 @@ input[type="range"] {
     const sliderEl = document.getElementById('slider-limite-tabs');
     const valEl    = document.getElementById('limite-tabs-val');
     const wrapEl   = document.getElementById('limite-tabs-wrap');
-    if (sliderEl) sliderEl.value = limitVal;
-    if (valEl)    valEl.textContent = limitVal;
+    if (sliderEl) sliderEl.value = perfConfig.limite_tabs_n ?? 10;
+    if (valEl)    valEl.textContent = perfConfig.limite_tabs_n ?? 10;
     if (wrapEl)   wrapEl.style.display = perfConfig.limite_tabs ? 'block' : 'none';
+    if (sliderIntervalo) sliderIntervalo.value = perfConfig.intervalo_suspension ?? 5;
+    if (intervaloVal)    intervaloVal.textContent = perfConfig.intervalo_suspension ?? 5;
+    if (sliderCache)     sliderCache.value = perfConfig.intervalo_cache ?? 30;
+    if (cacheVal)        cacheVal.textContent = perfConfig.intervalo_cache ?? 30;
   }
 
-  document.querySelectorAll('[data-perf]').forEach(btn => {
-    btn.addEventListener('click', () => {
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('[data-perf]');
+      if (!btn) return;
       const key = btn.dataset.perf;
       perfConfig[key] = !perfConfig[key];
-      aplicarPerfUI();
+      btn.classList.toggle('on', !!perfConfig[key]);
       window.chrome.webview.postMessage('perf:config:' + JSON.stringify(perfConfig));
-      // Mensaje específico para media background
-      if (key === 'suspender_media')
-        window.chrome.webview.postMessage('perf:media_background:' + perfConfig[key]);
-    });
   });
 
   document.getElementById('slider-limite-tabs').addEventListener('input', function() {
@@ -1381,7 +1513,7 @@ input[type="range"] {
 
   // ── Navegación entre secciones ──────────────────────
   function mostrarSeccion(id) {
-    ['apariencia','atajos','rendimiento','buscador','privacidad','widgets','sidebar','datos','actualizaciones'].forEach(s => {
+    ['apariencia','atajos','rendimiento','buscador','privacidad','widgets','sidebar','datos','actualizaciones','general'].forEach(s => {
       const el = document.getElementById('seccion-' + s);
       if (el) el.style.display = s === id ? 'block' : 'none';
     });
@@ -1566,15 +1698,24 @@ input[type="range"] {
   let _updateUrl = '';
 
   function buscarActualizaciones() {
-      const estado = document.getElementById('update-estado');
-      const titulo = document.getElementById('update-titulo');
-      const notas  = document.getElementById('update-notas');
-      const btn    = document.getElementById('update-btn');
+      const esPreview = document.getElementById('version-actual')
+          ?.textContent?.includes('-prev') ||
+          document.getElementById('version-actual')
+          ?.textContent?.includes('-beta') ||
+          document.getElementById('version-actual')
+          ?.textContent?.includes('-alpha');
 
-      estado.style.display = 'block';
-      titulo.textContent   = 'Buscando actualizaciones...';
-      notas.textContent    = '';
-      btn.style.display    = 'none';
+      // Mostrar "Buscando..." solo en la card correcta
+      document.getElementById('update-estado').style.display         = esPreview ? 'none' : 'block';
+      document.getElementById('update-estado-preview').style.display = esPreview ? 'block' : 'none';
+
+      const tituloId = esPreview ? 'update-titulo-preview' : 'update-titulo';
+      const notasId  = esPreview ? 'update-notas-preview'  : 'update-notas';
+      const btnId    = esPreview ? 'update-btn-preview'    : 'update-btn';
+
+      document.getElementById(tituloId).textContent = 'Buscando actualizaciones...';
+      document.getElementById(notasId).textContent  = '';
+      document.getElementById(btnId).style.display  = 'none';
 
       window.chrome.webview.postMessage('update:check');
   }
@@ -1592,40 +1733,110 @@ input[type="range"] {
       if (el1) el1.textContent = 'v' + v;
       if (el2) el2.textContent = 'AtsukiBrowser · v' + v;
       if (el3) el3.textContent = 'v' + v;
+
+      // Ocultar casilla de previews si es versión preview
+      const esPreview = v.includes('-prev') || v.includes('-beta') || v.includes('-alpha');
+      const casillaPrev = document.getElementById('toggle-previews')?.closest('div[style*="display:flex"]');
+      if (casillaPrev) casillaPrev.style.display = esPreview ? 'none' : '';
     }
   });
   
-  window.chrome.webview.addEventListener('message', e => {
+    window.chrome.webview.addEventListener('message', e => {
       const raw = e.data;
-      if (raw.startsWith('update:')) {
-          const data  = JSON.parse(raw.slice('update:'.length));
+      if (!raw.startsWith('update:')) return;
+      const data = JSON.parse(raw.slice('update:'.length));
+
+      // Ocultar ambas cards primero
+      document.getElementById('update-estado').style.display = 'none';
+      document.getElementById('update-estado-preview').style.display = 'none';
+
+      const esPreview      = data.esPreview === true;
+      const toggleWrap     = document.getElementById('toggle-previews')?.closest('div[style*="Canal"]') 
+                            ?? document.getElementById('toggle-previews')?.closest('div.section > div:nth-child(2)');
+
+      // Ocultar la casilla de previews si es versión preview
+      const casillaPrev = document.getElementById('toggle-previews')?.closest('div[style*="display:flex"]');
+      if (casillaPrev) casillaPrev.style.display = esPreview ? 'none' : '';
+
+      if (esPreview)
+      {
+          // Solo mostrar card preview, ocultar estable
+          document.getElementById('update-estado').style.display = 'none';
+
+          const estadoPrev = document.getElementById('update-estado-preview');
+          const tituloPrev = document.getElementById('update-titulo-preview');
+          const notasPrev  = document.getElementById('update-notas-preview');
+          const btnPrev    = document.getElementById('update-btn-preview');
+          estadoPrev.style.display = 'block';
+
+          if (data.hayUpdate) {
+              estadoPrev.style.borderColor = 'rgba(124,58,237,0.6)';
+              tituloPrev.innerHTML = `✦ Nueva preview — <strong>v${data.version}</strong>`;
+              notasPrev.textContent = data.notas;
+              btnPrev.style.display = 'inline-block';
+              btnPrev.onclick = () => window.chrome.webview.postMessage('update:instalar:' + data.url);
+          } else if (data.error) {
+              estadoPrev.style.borderColor = 'rgba(255,85,85,0.4)';
+              tituloPrev.textContent = '✖ Error al buscar actualizaciones';
+              notasPrev.textContent  = data.error;
+              btnPrev.style.display  = 'none';
+          } else {
+              estadoPrev.style.borderColor = 'rgba(80,250,123,0.3)';
+              tituloPrev.textContent = '✓ Preview al día';
+              notasPrev.textContent  = `v${data.version} es la preview más reciente.`;
+              btnPrev.style.display  = 'none';
+          }
+      }
+      else
+      {
+          // Estable: mostrar card estable
           const estado = document.getElementById('update-estado');
           const titulo = document.getElementById('update-titulo');
           const notas  = document.getElementById('update-notas');
           const btn    = document.getElementById('update-btn');
-
           estado.style.display = 'block';
 
           if (data.hayUpdate) {
               estado.style.borderColor = 'rgba(124,58,237,0.5)';
-              titulo.innerHTML = `✦ Nueva versión disponible — <strong>v${data.version}</strong>`;
+              titulo.innerHTML = `✦ Nueva versión — <strong>v${data.version}</strong>`;
               notas.textContent = data.notas;
               btn.style.display = 'inline-block';
-              _updateUrl = data.url;
-              btn.onclick = () => window.chrome.webview.postMessage('update:instalar:' + _updateUrl);
+              btn.onclick = () => window.chrome.webview.postMessage('update:instalar:' + data.url);
           } else if (data.error) {
               estado.style.borderColor = 'rgba(255,85,85,0.4)';
               titulo.textContent = '✖ Error al buscar actualizaciones';
               notas.textContent  = data.error;
+              btn.style.display  = 'none';
           } else {
               estado.style.borderColor = 'rgba(80,250,123,0.3)';
               titulo.textContent = '✓ Estás al día';
-              notas.textContent  = `Versión ${data.version} es la más reciente.`;
+              notas.textContent  = `v${data.version} es la más reciente.`;
+              btn.style.display  = 'none';
           }
-      }
-      else if (raw.startsWith('previews:')) {
-          const activo = raw.slice('previews:'.length) === 'true';
-          actualizarTogglePreviews(activo);
+
+          // Card preview separada (si la casilla está activada)
+          const estadoPrev = document.getElementById('update-estado-preview');
+          if (data.mostrarPreview) {
+              const tituloPrev = document.getElementById('update-titulo-preview');
+              const notasPrev  = document.getElementById('update-notas-preview');
+              const btnPrev    = document.getElementById('update-btn-preview');
+              estadoPrev.style.display = 'block';
+
+              if (data.hayUpdatePreview) {
+                  estadoPrev.style.borderColor = 'rgba(124,58,237,0.6)';
+                  tituloPrev.innerHTML = `✦ Nueva preview — <strong>v${data.versionPreview}</strong>`;
+                  notasPrev.textContent = data.notasPreview;
+                  btnPrev.style.display = 'inline-block';
+                  btnPrev.onclick = () => window.chrome.webview.postMessage('update:instalar:' + data.urlPreview);
+              } else {
+                  estadoPrev.style.borderColor = 'rgba(80,250,123,0.3)';
+                  tituloPrev.textContent = '✓ Preview al día';
+                  notasPrev.textContent  = `v${data.versionPreview} es la preview más reciente.`;
+                  btnPrev.style.display  = 'none';
+              }
+          } else {
+              estadoPrev.style.display = 'none';
+          }
       }
   });
 
@@ -1645,6 +1856,158 @@ input[type="range"] {
           actualizarTogglePreviews(this.checked);
           window.chrome.webview.postMessage(this.checked ? 'previews:activar' : 'previews:desactivar');
       });
+  });
+
+  // ── Tipografía con preview ──────────────────────────
+  const fontSelect = document.getElementById('s-font');
+  const fontPreview = document.getElementById('font-preview');
+
+  const GOOGLE_FONTS = ['Inter','Nunito','Poppins','DM Sans','Outfit',
+    'Plus Jakarta Sans','JetBrains Mono','Fira Code','Source Code Pro',
+    'Orbitron','Rajdhani','Oxanium','Exo 2','Lora','Playfair Display'];
+
+  function cargarFuente(nombre) {
+    if (!GOOGLE_FONTS.includes(nombre)) return;
+    const id = `gf-${nombre.replace(/ /g,'+')}`;
+    if (document.getElementById(id)) return;
+    const link = document.createElement('link');
+    link.id = id;
+    link.rel = 'stylesheet';
+    link.href = `https://fonts.googleapis.com/css2?family=${nombre.replace(/ /g,'+')}:wght@400;500;600&display=swap`;
+    document.head.appendChild(link);
+  }
+
+  fontSelect?.addEventListener('change', () => {
+    const fuente = fontSelect.value;
+    cargarFuente(fuente);
+    if (fontPreview) fontPreview.style.fontFamily = `'${fuente}', sans-serif`;
+  });
+
+  // ── Animaciones ──────────────────────────────────────
+  document.getElementById('toggle-animaciones')?.addEventListener('click', function() {
+    this.classList.toggle('on');
+    const activo = this.classList.contains('on');
+    const path = activo ? '' : Path;
+    window.chrome.webview.postMessage('ui:animaciones:' + activo);
+    // Aplicar localmente
+    if (!activo) {
+      const style = document.getElementById('__no-anim__') || document.createElement('style');
+      style.id = '__no-anim__';
+      style.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }';
+      document.head.appendChild(style);
+    } else {
+      document.getElementById('__no-anim__')?.remove();
+    }
+    localStorage.setItem('atsuki_animaciones', activo);
+  });
+
+  // Restaurar estado de animaciones
+  if (localStorage.getItem('atsuki_animaciones') === 'false') {
+    document.getElementById('toggle-animaciones')?.classList.remove('on');
+    const style = document.createElement('style');
+    style.id = '__no-anim__';
+    style.textContent = '*, *::before, *::after { transition: none !important; animation: none !important; }';
+    document.head.appendChild(style);
+  }
+
+  // ── Densidad ─────────────────────────────────────────
+  document.getElementById('sel-densidad')?.addEventListener('change', function() {
+    const val = this.value;
+    localStorage.setItem('atsuki_densidad', val);
+    window.chrome.webview.postMessage('ui:densidad:' + val);
+    aplicarDensidad(val);
+  });
+
+  function aplicarDensidad(val) {
+    const root = document.documentElement;
+    if (val === 'compacto') {
+      root.style.setProperty('--row-padding', '6px 14px');
+      root.style.setProperty('--font-size-base', '12px');
+    } else if (val === 'espacioso') {
+      root.style.setProperty('--row-padding', '14px 20px');
+      root.style.setProperty('--font-size-base', '14px');
+    } else {
+      root.style.setProperty('--row-padding', '10px 16px');
+      root.style.setProperty('--font-size-base', '13px');
+    }
+  }
+
+  // Restaurar densidad
+  const densidadGuardada = localStorage.getItem('atsuki_densidad') ?? 'normal';
+  const selDensidad = document.getElementById('sel-densidad');
+  if (selDensidad) selDensidad.value = densidadGuardada;
+  aplicarDensidad(densidadGuardada);
+
+  // ── General: Al iniciar ──────────────────────────────
+  (function() {
+    const radios = document.querySelectorAll('input[name="inicio"]');
+    const urlWrap = document.getElementById('inicio-url-wrap');
+    const urlInput = document.getElementById('inicio-url');
+
+    // Cargar preferencia guardada
+    window.chrome.webview.postMessage('get:inicio');
+
+    window.chrome.webview.addEventListener('message', e => {
+      if (typeof e.data !== 'string') return;
+      if (e.data.startsWith('inicio:')) {
+        try {
+          const cfg = JSON.parse(e.data.slice('inicio:'.length));
+          radios.forEach(r => {
+            if (r.value === cfg.modo) r.checked = true;
+          });
+          if (cfg.url) urlInput.value = cfg.url;
+          urlWrap.style.display = cfg.modo === 'personalizada' ? 'block' : 'none';
+        } catch {}
+      }
+    });
+
+    radios.forEach(r => r.addEventListener('change', () => {
+      urlWrap.style.display = r.value === 'personalizada' ? 'block' : 'none';
+      if (r.value !== 'personalizada') guardarInicio();
+    }));
+  })();
+
+  function guardarInicio() {
+    const modo = document.querySelector('input[name="inicio"]:checked')?.value ?? 'nuevatab';
+    const url  = document.getElementById('inicio-url')?.value.trim() ?? '';
+    window.chrome.webview.postMessage('set:inicio:' + JSON.stringify({ modo, url }));
+  }
+
+  // ── Confirmar al cerrar ──────────────────────────────
+  const toggleCerrar = document.getElementById('toggle-confirmar-cerrar');
+  window.chrome.webview.postMessage('get:confirmar_cerrar');
+  window.chrome.webview.addEventListener('message', e => {
+    if (typeof e.data !== 'string') return;
+    if (e.data.startsWith('confirmar_cerrar:')) {
+      const val = e.data.endsWith('true');
+      toggleCerrar?.classList.toggle('on', val);
+    }
+  });
+  toggleCerrar?.addEventListener('click', function() {
+    this.classList.toggle('on');
+    window.chrome.webview.postMessage('set:confirmar_cerrar:' + this.classList.contains('on'));
+  });
+
+  const sliderIntervalo = document.getElementById('slider-intervalo');
+  const intervaloVal    = document.getElementById('intervalo-val');
+
+  sliderIntervalo?.addEventListener('input', () => {
+      intervaloVal.textContent = sliderIntervalo.value;
+  });
+  sliderIntervalo?.addEventListener('change', () => {
+      perfConfig.intervalo_suspension = parseInt(sliderIntervalo.value);
+      window.chrome.webview.postMessage('perf:config:' + JSON.stringify(perfConfig));
+  });
+
+  const sliderCache = document.getElementById('slider-intervalo-cache');
+  const cacheVal    = document.getElementById('intervalo-cache-val');
+
+  sliderCache?.addEventListener('input', () => {
+      cacheVal.textContent = sliderCache.value;
+  });
+  sliderCache?.addEventListener('change', () => {
+      perfConfig.intervalo_cache = parseInt(sliderCache.value);
+      window.chrome.webview.postMessage('perf:config:' + JSON.stringify(perfConfig));
   });
 </script>
 </body>
