@@ -94,7 +94,8 @@ namespace atsukibrowser
                 if (_tabButtons[index].Tag is TextBlock label)
                     label.Text = titulo;
 
-                _historial.Agregar(url, titulo);
+                if (_guardarHistorial)
+                    _historial.Agregar(url, titulo);
                 ActualizarFaviconTab(index, url);
                 if (index == _activeTab)
                 {
@@ -365,6 +366,7 @@ namespace atsukibrowser
                     var u when u.Contains("AtsukiNotes.html") => "atsuki://notes",
                     var u when u.Contains("Ayuda.html") => "atsuki://ayuda",
                     var u when u.Contains("AtsukiDraw.html") => "atsuki://draw",
+                    var u when u.Contains("AtsukiNovedades.html") => "atsuki://novedades",
                     _ => url
                 };
 

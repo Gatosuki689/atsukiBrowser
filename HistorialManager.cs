@@ -18,7 +18,7 @@ namespace atsukibrowser
         private List<EntradaHistorial> _entradas = new();
         public IReadOnlyList<EntradaHistorial> Entradas => _entradas;
 
-        private System.Threading.CancellationTokenSource? _guardadoCts;  // ← agrega esto
+        private System.Threading.Timer? _guardadoTimer;
 
         public HistorialManager(string carpeta)
         {
@@ -47,26 +47,14 @@ namespace atsukibrowser
 
         private void GuardarConDebounce()
         {
-            _guardadoCts?.Cancel();
-            _guardadoCts = new System.Threading.CancellationTokenSource();
-            var token = _guardadoCts.Token;
-
-            Task.Run(async () =>
-            {
-                try
-                {
-                    await Task.Delay(1500, token);  // espera 1.5s antes de escribir
-                    if (!token.IsCancellationRequested)
-                        Guardar();
-                }
-                catch (TaskCanceledException) { }
-            });
+            _guardadoTimer?.Dispose();
+            _guardadoTimer = new System.Threading.Timer(_ => Guardar(), null, 1500, System.Threading.Timeout.Infinite);
         }
-
 
         public void Limpiar()
         {
             _entradas.Clear();
+            _guardadoTimer?.Dispose();
             Guardar();
         }
 

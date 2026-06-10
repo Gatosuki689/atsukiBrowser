@@ -519,6 +519,9 @@
                             <Button Content="🕐  Historial"             Click="MenuHistorial_Click"    Style="{StaticResource MenuItemStyle}"/>
                             <Separator Background="#2a1a4e" Margin="8,2"/>
                             <Button Content="⚙  Ajustes"               Click="BtnAjustes_Click"       Style="{StaticResource MenuItemStyle}"/>
+                            <Button Content="⚙  Ajustes"               Click="BtnAjustes_Click"       Style="{StaticResource MenuItemStyle}"/>
+                            <Button Content="❓  Ayuda"                 Click="MenuAyuda_Click"         Style="{StaticResource MenuItemStyle}"/>
+                            <Button Content="✦  Novedades"              Click="MenuNovedades_Click"     Style="{StaticResource MenuItemStyle}"/>
                             <Separator Background="#1a1030" Margin="8,4"/>
                             <TextBlock Text="PERFIL" Foreground="#444466" FontSize="9"
                                     Margin="12,6,0,2"/>

@@ -98,9 +98,14 @@ namespace atsukibrowser
                 _extensiones = new ExtensionesManager(_carpetaPerfil);
                 _atajos      = new AtajosManager(_carpetaPerfil);
                 _busquedasPath = Path.Combine(_carpetaPerfil, "busquedas.json");
+                _cookies = new CookiesManager(_carpetaPerfil);
                 CargarBusquedas();
                 CargarZoom();
 
+                string cookiesAutoPath = Path.Combine(_carpetaPerfil, "cookies_auto.txt");
+                if (File.Exists(cookiesAutoPath))
+                    _cookiesAutoAceptar = File.ReadAllText(cookiesAutoPath).Trim() != "False";
+                    
                 string confirmarPath = Path.Combine(_carpetaPerfil, "confirmar_cerrar.txt");
                 if (File.Exists(confirmarPath))
                     _confirmarCerrar = File.ReadAllText(confirmarPath).Trim() == "true";

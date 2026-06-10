@@ -332,11 +332,11 @@ namespace atsukibrowser
         {
             string path = Path.Combine(_carpetaPerfil, "ultima_version.txt");
             string versionGuardada = File.Exists(path) ? File.ReadAllText(path).Trim() : "";
-            if (versionGuardada == AppVersion) return;
+            bool esNueva = versionGuardada != AppVersion;
 
-            // Primera vez con esta versión — guardar y abrir notas
-            File.WriteAllText(path, AppVersion);
+            if (esNueva) File.WriteAllText(path, AppVersion);
 
+            // Siempre descargar y guardar notas
             _ = Task.Run(async () =>
             {
                 try
@@ -344,11 +344,18 @@ namespace atsukibrowser
                     _httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "AtsukiBrowser");
                     string json = await _httpClient.GetStringAsync(
                         $"https://gist.githubusercontent.com/Gatosuki689/f24638ebb9ed77db3a58fc2318103b39/raw/version.json?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
-
                     var doc  = JsonSerializer.Deserialize<JsonElement>(json);
                     string notas = doc.TryGetProperty("notas", out var n) ? n.GetString() ?? "" : "";
+                    if (AppVersion.Contains("-") && doc.TryGetProperty("preview", out var prev))
+                        if (prev.TryGetProperty("notas", out var pn))
+                            notas = pn.GetString() ?? notas;
 
-                    Dispatcher.Invoke(() => AbrirNotasVersion(AppVersion, notas));
+                    string notasPath = Path.Combine(_carpetaPerfil, "notas_version.txt");
+                    File.WriteAllText(notasPath, notas);
+
+                    // Solo abrir la página si es versión nueva
+                    if (esNueva)
+                        Dispatcher.Invoke(() => AbrirNotasVersion(notas));
                 }
                 catch { }
             });

@@ -396,6 +396,9 @@ input[type="range"] {
     <a class="sb-item" href="#" onclick="mostrarSeccion('actualizaciones'); return false;">
       <span class="sb-icon">🔄</span><span class="sb-label">Actualizaciones</span>
     </a>
+    <a class="sb-item" href="#" onclick="mostrarSeccion('cookies'); return false;">
+      <span class="sb-icon">🍪</span> Cookies
+    </a>
     <div class="sb-item" onclick="navigate('ayuda')">❓ Ayuda</div>
   </div>
 
@@ -935,6 +938,49 @@ input[type="range"] {
                 cursor:pointer; font-family:var(--font);">
           Instalar preview
         </button>
+      </div>
+    </div>
+  </div>
+  <!-- ── Cookies ── -->
+  <div id="seccion-cookies" style="display:none">
+    <div id="header">
+      <h2>Ajustes — <span>Cookies</span></h2>
+      <p>Gestiona el auto-aceptado de cookies por sitio</p>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Auto-aceptar cookies</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Aceptar banners automáticamente</div>
+            <div class="perf-desc">Hace click en "Aceptar" en banners de cookies al cargar páginas</div>
+          </div>
+          <button class="sb-widget-toggle on" id="toggle-auto-cookies"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">Reglas por sitio</div>
+      <div style="font-size:12px; color:var(--muted); margin-bottom:14px;">
+        Sitios marcados como <strong style="color:#ef4444">bloqueados</strong> nunca tendrán auto-aceptado.
+      </div>
+
+      <!-- Agregar regla manual -->
+      <div style="display:flex; gap:8px; margin-bottom:16px;">
+        <input type="text" id="cookie-dominio-input" placeholder="ejemplo.com"
+          style="flex:1; background:var(--surface2); border:1px solid var(--border);
+                border-radius:8px; padding:8px 12px; color:var(--text);
+                font-size:13px; font-family:var(--font); outline:none;"/>
+        <button class="btn-fondo" onclick="bloquearDominio()" style="white-space:nowrap">🚫 Bloquear</button>
+        <button class="btn-aplicar" onclick="permitirDominio()" style="white-space:nowrap; margin:0">✅ Permitir</button>
+      </div>
+
+      <!-- Lista de reglas -->
+      <div id="cookie-reglas-lista" style="display:flex; flex-direction:column; gap:6px;"></div>
+      <div id="cookie-reglas-empty" style="font-size:12px; color:var(--muted); display:none;">
+        No hay reglas configuradas. Todos los sitios tienen auto-aceptado activo.
       </div>
     </div>
   </div>
@@ -1524,7 +1570,7 @@ input[type="range"] {
 
   // ── Navegación entre secciones ──────────────────────
   function mostrarSeccion(id) {
-    ['apariencia','atajos','rendimiento','buscador','privacidad','widgets','sidebar','datos','actualizaciones','general'].forEach(s => {
+    ['apariencia','atajos','rendimiento','buscador','privacidad','widgets','sidebar','datos','actualizaciones','general','cookies'].forEach(s => {
       const el = document.getElementById('seccion-' + s);
       if (el) el.style.display = s === id ? 'block' : 'none';
     });
@@ -1876,6 +1922,45 @@ input[type="range"] {
       });
   });
 
+  // ── Sincronizar todos los toggles con C# al cargar ──
+  window.chrome.webview.postMessage('get:ui:config');
+
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string') return;
+    if (!raw.startsWith('ui:config:')) return;
+
+    try {
+      const cfg = JSON.parse(raw.slice('ui:config:'.length));
+
+      // Animaciones
+      if (cfg.animaciones !== undefined) {
+        document.getElementById('toggle-animaciones')
+          ?.classList.toggle('on', cfg.animaciones);
+        if (!cfg.animaciones) {
+          const s = document.getElementById('__no-anim__') || document.createElement('style');
+          s.id = '__no-anim__';
+          s.textContent = '*, *::before, *::after { transition:none!important; animation:none!important; }';
+          document.head.appendChild(s);
+        }
+      }
+
+      // Privacidad
+      if (cfg.guardar_historial !== undefined)
+        document.querySelector('[data-priv="guardar_historial"]')
+          ?.classList.toggle('on', cfg.guardar_historial);
+      if (cfg.guardar_favoritos !== undefined)
+        document.querySelector('[data-priv="guardar_favoritos"]')
+          ?.classList.toggle('on', cfg.guardar_favoritos);
+
+      // Auto-cookies
+      if (cfg.auto_cookies !== undefined)
+        document.getElementById('toggle-auto-cookies')
+          ?.classList.toggle('on', cfg.auto_cookies);
+
+    } catch {}
+  });
+
   // ── Tipografía con preview ──────────────────────────
   const fontSelect = document.getElementById('s-font');
   const fontPreview = document.getElementById('font-preview');
@@ -2040,6 +2125,127 @@ input[type="range"] {
   });
 
   window.chrome.webview.postMessage('get:nuevatab:layout')
+
+  // ── Cookies ──────────────────────────────────────────
+  function renderCookieReglas(reglas) {
+    const lista  = document.getElementById('cookie-reglas-lista');
+    const empty  = document.getElementById('cookie-reglas-empty');
+    lista.innerHTML = '';
+
+    if (!reglas || reglas.length === 0) {
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    reglas.forEach(r => {
+      const row = document.createElement('div');
+      row.style.cssText = `display:flex; align-items:center; justify-content:space-between;
+        padding:10px 14px; background:var(--surface2); border:1px solid var(--border);
+        border-radius:8px; gap:12px;`;
+
+      const badge = r.bloqueado
+        ? `<span style="font-size:10px; padding:2px 8px; border-radius:4px;
+            background:rgba(239,68,68,0.15); color:#ef4444;">BLOQUEADO</span>`
+        : `<span style="font-size:10px; padding:2px 8px; border-radius:4px;
+            background:rgba(52,211,153,0.15); color:#34d399;">PERMITIDO</span>`;
+
+      row.innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px; flex:1; min-width:0;">
+          <img src="https://www.google.com/s2/favicons?domain=${r.dominio}&sz=16"
+              style="width:16px;height:16px;" onerror="this.style.display='none'"/>
+          <span style="font-size:13px; color:var(--text); overflow:hidden;
+                text-overflow:ellipsis; white-space:nowrap;">${r.dominio}</span>
+          ${badge}
+        </div>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <button class="btn-fondo" onclick="toggleCookieRegla('${r.dominio}', ${!r.bloqueado})"
+            style="font-size:11px; padding:4px 10px;">
+            ${r.bloqueado ? '✅ Permitir' : '🚫 Bloquear'}
+          </button>
+          <button class="btn-fondo" onclick="eliminarCookieRegla('${r.dominio}')"
+            style="font-size:11px; padding:4px 10px; color:#ef4444;">✕</button>
+        </div>`;
+      lista.appendChild(row);
+    });
+  }
+
+  function bloquearDominio() {
+    const d = document.getElementById('cookie-dominio-input').value.trim();
+    if (!d) return;
+    window.chrome.webview.postMessage('cookies:bloquear:' + d);
+    document.getElementById('cookie-dominio-input').value = '';
+    setTimeout(() => window.chrome.webview.postMessage('get:cookies'), 300);
+  }
+
+  function permitirDominio() {
+    const d = document.getElementById('cookie-dominio-input').value.trim();
+    if (!d) return;
+    window.chrome.webview.postMessage('cookies:permitir:' + d);
+    document.getElementById('cookie-dominio-input').value = '';
+    setTimeout(() => window.chrome.webview.postMessage('get:cookies'), 300);
+  }
+
+  function toggleCookieRegla(dominio, bloquear) {
+    window.chrome.webview.postMessage(
+      (bloquear ? 'cookies:bloquear:' : 'cookies:permitir:') + dominio);
+    setTimeout(() => window.chrome.webview.postMessage('get:cookies'), 300);
+  }
+
+  function eliminarCookieRegla(dominio) {
+    window.chrome.webview.postMessage('cookies:eliminar:' + dominio);
+    setTimeout(() => window.chrome.webview.postMessage('get:cookies'), 300);
+  }
+
+  // Recibir datos de cookies desde C#
+  window.chrome.webview.addEventListener('message', e => {
+    const msg = e.data;
+    if (typeof msg !== 'string') return;
+
+    if (msg.startsWith('cookies:reglas:')) {
+      try {
+        const reglas = JSON.parse(msg.slice('cookies:reglas:'.length));
+        renderCookieReglas(reglas);
+      } catch {}
+    }
+  });
+
+  // ── Toggle auto-cookies ──────────────────────────────
+  (function() {
+    const toggle = document.getElementById('toggle-auto-cookies');
+    if (!toggle) return;
+
+    // Cargar estado guardado
+    const activo = localStorage.getItem('auto-cookies') !== 'false';
+    toggle.classList.toggle('on', activo);
+    window.chrome.webview.postMessage('cookies:auto:' + activo);
+
+    toggle.addEventListener('click', function() {
+      this.classList.toggle('on');
+      const nuevoEstado = this.classList.contains('on');
+      localStorage.setItem('auto-cookies', nuevoEstado);
+      window.chrome.webview.postMessage('cookies:auto:' + nuevoEstado);
+    });
+  })();
+
+  // Pedir reglas al entrar a sección cookies
+  const _origMostrarSeccion2 = mostrarSeccion;
+  mostrarSeccion = function(id) {
+    _origMostrarSeccion2(id);
+    if (id === 'cookies')
+      window.chrome.webview.postMessage('get:cookies');
+  };
+
+  // Recibir reglas de cookies
+  window.chrome.webview.addEventListener('message', e => {
+    const msg = e.data;
+    if (typeof msg !== 'string') return;
+    if (msg.startsWith('cookies:reglas:')) {
+      try {
+        renderCookieReglas(JSON.parse(msg.slice('cookies:reglas:'.length)));
+      } catch {}
+    }
+  });
 </script>
 </body>
 </html>

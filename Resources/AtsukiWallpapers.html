@@ -436,11 +436,8 @@ body {
 // ═══════════════════════════════════════════════
 let paginaActual  = 1;
 let totalPaginas  = 1;
-let apiKey        = localStorage.getItem('wh_apikey') ?? '';
 let wallActual    = null; // wallpaper seleccionado en modal
 let buscando      = false;
-
-if (apiKey) document.getElementById('apikey-input').value = apiKey;
 
 // Filtros activos
 let filtros = {
@@ -457,10 +454,11 @@ async function buscar(pagina = 1) {
   if (buscando) return;
   buscando = true;
 
+  document.getElementById('content').scrollTop = 0;
   document.getElementById('grid').innerHTML = '';
   document.getElementById('loader').style.display = 'flex';
 
-  const cats = filtros.categorias;
+  const cats = filtros.categorias.length > 0 ? filtros.categorias : ['general'];
   const catBits = [
     cats.includes('general') ? '1' : '0',
     cats.includes('anime')   ? '1' : '0',
@@ -502,7 +500,7 @@ function renderGrid(walls) {
     const item = document.createElement('div');
     item.className = 'wall-item';
     item.innerHTML = `
-      <img src="${wall.thumbs.large}" loading="lazy" alt="${wall.id}"/>
+      <img src="${wall.thumbs.small}" loading="lazy" alt="${wall.id}"/>
       <div class="wall-overlay">
         <div class="wall-res">${wall.resolution} · ${formatSize(wall.file_size)}</div>
         <div class="wall-actions">
@@ -512,6 +510,13 @@ function renderGrid(walls) {
       </div>
     `;
 
+    let preloaded = false;
+    item.addEventListener('mouseenter', () => {
+      if (preloaded) return;
+      preloaded = true;
+      const pre = new Image();
+      pre.src = wall.path;
+    });
     item.querySelector('.preview').addEventListener('click', e => {
       e.stopPropagation();
       abrirModal(wall);
@@ -535,11 +540,17 @@ function formatSize(bytes) {
 // ═══════════════════════════════════════════════
 function abrirModal(wall) {
   wallActual = wall;
-  document.getElementById('modal-img').src = wall.thumbs.large;
+  const modalImg = document.getElementById('modal-img');
+  modalImg.src = wall.thumbs.large;
+  modalImg.style.filter = 'blur(2px)';
   document.getElementById('modal').classList.add('open');
-  // Cargar imagen full en background
+
   const full = new Image();
-  full.onload = () => { document.getElementById('modal-img').src = wall.path; };
+  full.onload = () => {
+    modalImg.src = wall.path;
+    modalImg.style.filter = '';
+  };
+  full.onerror = () => { modalImg.style.filter = ''; };
   full.src = wall.path;
 }
 
@@ -560,7 +571,9 @@ document.getElementById('modal-aplicar').addEventListener('click', () => {
 });
 
 document.getElementById('modal-descargar').addEventListener('click', () => {
-  if (wallActual) window.chrome.webview.postMessage('descargar:' + wallActual.path);
+  if (!wallActual) return;
+  window.chrome.webview.postMessage('wallhaven:descargar:' + wallActual.path);
+  toast('⬇ Descargando wallpaper...');
 });
 
 // ═══════════════════════════════════════════════
@@ -667,6 +680,12 @@ window.chrome?.webview?.addEventListener('message', e => {
         </div>`;
     document.getElementById('loader').style.display = 'none';
     buscando = false;
+    }
+    if (raw.startsWith('wallhaven:descargado:')) {
+        toast('✓ Wallpaper guardado en ' + raw.slice('wallhaven:descargado:'.length));
+    }
+    if (raw.startsWith('wallhaven:descarga-error:')) {
+        toast('✗ Error al descargar: ' + raw.slice('wallhaven:descarga-error:'.length), 4000);
     }
 });
 

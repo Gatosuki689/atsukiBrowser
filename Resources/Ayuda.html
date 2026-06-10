@@ -36,262 +36,251 @@ body {
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
-#app-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: white;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
+#app-title { font-size: 13px; font-weight: 700; color: white; letter-spacing: 0.08em; text-transform: uppercase; }
 #app-title span { color: var(--accent2); }
-
-#search-wrap {
-  flex: 1;
-  max-width: 400px;
-  margin: 0 auto;
-  position: relative;
-}
+#search-wrap { flex: 1; max-width: 400px; margin: 0 auto; position: relative; }
 #search-help {
-  width: 100%;
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 7px 14px 7px 36px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-family: 'Segoe UI', sans-serif;
-  outline: none;
-  transition: border-color 0.15s;
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); padding: 7px 14px 7px 36px; border-radius: 20px;
+  font-size: 12px; font-family: 'Segoe UI', sans-serif; outline: none; transition: border-color 0.15s;
 }
 #search-help:focus { border-color: rgba(124,58,237,0.5); }
 #search-help::placeholder { color: var(--muted); }
-#search-icon {
-  position: absolute;
-  left: 12px; top: 50%;
-  transform: translateY(-50%);
-  color: var(--muted);
-  font-size: 13px;
-  pointer-events: none;
-}
-
+#search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; pointer-events: none; }
 .tb-btn {
-  background: rgba(124,58,237,0.1);
-  border: 1px solid var(--border);
-  color: var(--accent2);
-  padding: 0 14px;
-  height: 30px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 11px;
-  font-family: 'Segoe UI', sans-serif;
-  transition: all 0.15s;
+  background: rgba(124,58,237,0.1); border: 1px solid var(--border); color: var(--accent2);
+  padding: 0 14px; height: 30px; border-radius: 6px; cursor: pointer;
+  font-size: 11px; font-family: 'Segoe UI', sans-serif; transition: all 0.15s;
 }
 .tb-btn:hover { background: rgba(124,58,237,0.22); }
 
 /* ── LAYOUT ── */
-#body {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
+#body { flex: 1; display: flex; overflow: hidden; }
 
 /* ── SIDEBAR ── */
 #sidebar {
-  width: 220px;
-  background: #0a0a10;
-  border-right: 1px solid var(--border);
-  padding: 16px 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex-shrink: 0;
-  overflow-y: auto;
+  width: 220px; background: var(--surface); border-right: 1px solid var(--border);
+  padding: 16px 0; flex-shrink: 0; overflow-y: auto;
 }
-#sidebar::-webkit-scrollbar { width: 4px; }
-#sidebar::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 2px; }
-
+.nav-group { padding: 0 12px; margin-bottom: 4px; }
+.nav-label { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; padding: 8px 8px 4px; }
 .nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--muted);
-  transition: all 0.15s;
-  border: 1px solid transparent;
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer;
+  font-size: 13px; color: var(--muted); transition: all 0.12s;
+  margin-bottom: 2px;
 }
-.nav-item:hover { background: var(--surface); color: var(--text); }
-.nav-item.active {
-  background: rgba(124,58,237,0.12);
-  border-color: rgba(124,58,237,0.25);
-  color: var(--accent2);
+.nav-item:hover { background: rgba(255,255,255,0.05); color: var(--text); }
+.nav-item.active { background: rgba(124,58,237,0.15); color: var(--accent2); }
+.nav-icon { font-size: 15px; width: 20px; text-align: center; }
+.nav-badge {
+  margin-left: auto; font-size: 9px; background: var(--accent);
+  color: white; padding: 1px 6px; border-radius: 10px;
 }
-.nav-icon { font-size: 15px; flex-shrink: 0; width: 20px; text-align: center; }
 
-/* ── CONTENIDO ── */
-#content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 40px 60px;
-  max-width: 820px;
-}
-#content::-webkit-scrollbar { width: 6px; }
-#content::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 3px; }
-
-.seccion { display: none; }
+/* ── CONTENT ── */
+#content { flex: 1; overflow-y: auto; padding: 32px 40px; }
+.seccion { display: none; max-width: 760px; animation: fadeIn 0.2s ease; }
 .seccion.activa { display: block; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
 
-.seccion h1 {
-  font-size: 24px;
-  font-weight: 300;
-  color: white;
-  margin-bottom: 8px;
-}
-.seccion h1 span { color: var(--accent2); }
-.seccion .subtitulo {
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 32px;
-  line-height: 1.6;
-}
-
-.seccion h2 {
-  font-size: 14px;
-  font-weight: 600;
-  color: white;
-  margin: 28px 0 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.seccion p {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.8;
-  margin-bottom: 12px;
-}
-
-.seccion ul {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.seccion ul li {
-  font-size: 13px;
-  color: var(--muted);
-  padding-left: 16px;
-  position: relative;
-  line-height: 1.6;
-}
-.seccion ul li::before {
-  content: '▸';
-  position: absolute;
-  left: 0;
-  color: var(--accent2);
-}
-
-.tip-box {
-  background: rgba(124,58,237,0.08);
-  border: 1px solid rgba(124,58,237,0.2);
-  border-radius: 8px;
-  padding: 14px 16px;
-  margin: 16px 0;
-  font-size: 12px;
-  color: rgba(255,255,255,0.55);
-  line-height: 1.7;
-}
-.tip-box strong { color: var(--accent2); }
-
-.warn-box {
-  background: rgba(251,191,36,0.06);
-  border: 1px solid rgba(251,191,36,0.2);
-  border-radius: 8px;
-  padding: 14px 16px;
-  margin: 16px 0;
-  font-size: 12px;
-  color: rgba(255,255,255,0.55);
-  line-height: 1.7;
-}
-.warn-box strong { color: #fbbf24; }
-
-.step {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 16px;
-  align-items: flex-start;
-}
-.step-num {
-  width: 26px; height: 26px;
-  border-radius: 50%;
-  background: rgba(124,58,237,0.2);
-  border: 1px solid rgba(124,58,237,0.4);
-  color: var(--accent2);
-  font-size: 12px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-.step-body { flex: 1; }
-.step-body strong {
-  font-size: 13px;
-  color: var(--text);
-  display: block;
-  margin-bottom: 4px;
-}
-.step-body span {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.7;
-}
+h1 { font-size: 26px; font-weight: 300; color: white; margin-bottom: 6px; }
+h1 span { color: var(--accent2); }
+.subtitulo { font-size: 13px; color: var(--muted); margin-bottom: 28px; line-height: 1.6; }
+h2 { font-size: 13px; font-weight: 600; color: var(--accent2); text-transform: uppercase;
+     letter-spacing: 0.08em; margin: 28px 0 12px; }
+p { font-size: 13px; color: var(--text); line-height: 1.7; margin-bottom: 10px; }
+ul { padding-left: 20px; }
+ul li { font-size: 13px; color: var(--text); line-height: 1.8; }
 
 .kbd {
-  display: inline-block;
-  background: var(--surface2);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 4px;
-  padding: 2px 7px;
-  font-size: 11px;
-  color: var(--text);
-  font-family: 'Consolas', monospace;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface2); border: 1px solid rgba(255,255,255,0.15);
+  border-bottom: 2px solid rgba(255,255,255,0.08); color: var(--text);
+  padding: 2px 7px; border-radius: 5px; font-size: 11px; font-family: 'Segoe UI', sans-serif;
+  white-space: nowrap;
 }
 
-.atajos-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 16px;
+/* ── STEPS ── */
+.step {
+  display: flex; gap: 14px; align-items: flex-start;
+  margin-bottom: 12px; padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  transition: border-color 0.15s;
 }
+.step:hover { border-color: rgba(124,58,237,0.4); }
+.step-num {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: rgba(124,58,237,0.2); color: var(--accent2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; flex-shrink: 0; margin-top: 1px;
+}
+.step-body { display: flex; flex-direction: column; gap: 4px; }
+.step-body strong { font-size: 13px; color: white; }
+.step-body span { font-size: 12px; color: var(--muted); line-height: 1.6; }
+
+/* ── BOXES ── */
+.tip-box {
+  background: rgba(124,58,237,0.08); border: 1px solid rgba(124,58,237,0.25);
+  border-radius: 10px; padding: 14px 16px; font-size: 13px;
+  color: var(--text); margin: 16px 0; line-height: 1.6;
+}
+.warn-box {
+  background: rgba(251,191,36,0.07); border: 1px solid rgba(251,191,36,0.25);
+  border-radius: 10px; padding: 14px 16px; font-size: 13px;
+  color: var(--text); margin: 16px 0; line-height: 1.6;
+}
+.info-box {
+  background: rgba(52,211,153,0.07); border: 1px solid rgba(52,211,153,0.2);
+  border-radius: 10px; padding: 14px 16px; font-size: 13px;
+  color: var(--text); margin: 16px 0; line-height: 1.6;
+}
+
+/* ── ATAJOS GRID ── */
+.atajos-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
 .atajo-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; cursor: pointer; transition: all 0.15s; position: relative; overflow: hidden;
 }
-.atajo-desc { font-size: 12px; color: var(--muted); }
-.atajo-keys { display: flex; gap: 4px; }
+.atajo-item:hover { border-color: rgba(124,58,237,0.4); background: rgba(124,58,237,0.05); }
+.atajo-item.activo { border-color: var(--accent); background: rgba(124,58,237,0.12); }
+.atajo-item .flash {
+  position: absolute; inset: 0; background: rgba(124,58,237,0.25);
+  opacity: 0; border-radius: 8px; pointer-events: none;
+  transition: opacity 0.15s;
+}
+.atajo-item.activo .flash { opacity: 1; }
+.atajo-desc { font-size: 12px; color: var(--text); }
+.atajo-keys { display: flex; gap: 4px; align-items: center; }
 
-/* ── BÚSQUEDA ── */
-#no-resultados {
-  display: none;
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--muted);
-  font-size: 13px;
+/* ── DEMO BROWSER ── */
+.demo-browser {
+  background: #080810; border: 1px solid var(--border); border-radius: 12px;
+  overflow: hidden; margin: 16px 0; box-shadow: 0 8px 32px rgba(0,0,0,0.5);
 }
+.demo-titlebar {
+  background: #0d0d1a; padding: 8px 12px;
+  display: flex; align-items: center; gap: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.demo-dots { display: flex; gap: 5px; }
+.demo-dot { width: 10px; height: 10px; border-radius: 50%; }
+.demo-dot.r { background: #ff5f57; }
+.demo-dot.y { background: #febc2e; }
+.demo-dot.g { background: #28c840; }
+.demo-urlbar {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 10px; font-size: 11px;
+  color: var(--muted); font-family: 'Segoe UI', sans-serif;
+}
+.demo-body { padding: 16px; min-height: 120px; position: relative; }
+
+/* ── TAB DEMO ── */
+.demo-tabs { display: flex; gap: 4px; padding: 6px 8px 0; background: #0a0a14; }
+.demo-tab {
+  padding: 5px 12px; border-radius: 6px 6px 0 0; font-size: 11px;
+  cursor: pointer; transition: all 0.15s; display: flex; align-items: center; gap: 6px;
+}
+.demo-tab.active { background: #0d0d1a; color: white; }
+.demo-tab.inactive { background: rgba(255,255,255,0.04); color: var(--muted); }
+.demo-tab .demo-x { opacity: 0; transition: opacity 0.15s; font-size: 10px; }
+.demo-tab:hover .demo-x { opacity: 1; }
+.demo-tab-add {
+  width: 24px; height: 24px; border-radius: 50%; background: rgba(255,255,255,0.06);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted); cursor: pointer; font-size: 14px; transition: all 0.15s;
+  align-self: center;
+}
+.demo-tab-add:hover { background: rgba(255,255,255,0.12); color: white; }
+
+/* ── INTERACTIVE DEMO BUTTONS ── */
+.demo-btn {
+  background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.3);
+  color: var(--accent2); padding: 7px 16px; border-radius: 8px; cursor: pointer;
+  font-size: 12px; font-family: 'Segoe UI', sans-serif; transition: all 0.15s;
+  display: inline-flex; align-items: center; gap: 6px;
+}
+.demo-btn:hover { background: rgba(124,58,237,0.25); border-color: var(--accent); }
+.demo-btn:active { transform: scale(0.97); }
+
+/* ── THEME DEMO ── */
+.theme-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 12px 0; }
+.theme-card {
+  border-radius: 10px; border: 2px solid transparent; cursor: pointer;
+  overflow: hidden; transition: all 0.15s;
+}
+.theme-card:hover { transform: translateY(-2px); border-color: rgba(255,255,255,0.2); }
+.theme-card.sel { border-color: white; }
+.theme-preview { height: 56px; position: relative; }
+.theme-name { padding: 8px 10px; font-size: 11px; font-weight: 500; }
+
+/* ── COLOR PREVIEW ── */
+.color-row { display: flex; align-items: center; gap: 10px; margin: 8px 0; }
+.color-swatch { width: 20px; height: 20px; border-radius: 4px; flex-shrink: 0; }
+.color-label { font-size: 12px; color: var(--text); }
+.color-desc { font-size: 11px; color: var(--muted); }
+
+/* ── FAQ ACCORDION ── */
+.faq-item {
+  border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; overflow: hidden;
+  transition: border-color 0.15s;
+}
+.faq-item:hover { border-color: rgba(124,58,237,0.4); }
+.faq-q {
+  padding: 14px 16px; cursor: pointer; display: flex; align-items: center;
+  justify-content: space-between; font-size: 13px; font-weight: 500; color: white;
+  background: var(--surface); user-select: none;
+}
+.faq-arrow { color: var(--muted); transition: transform 0.2s; font-size: 12px; }
+.faq-item.open .faq-arrow { transform: rotate(180deg); }
+.faq-a {
+  padding: 0 16px; max-height: 0; overflow: hidden; transition: max-height 0.25s ease, padding 0.2s;
+  font-size: 13px; color: var(--muted); line-height: 1.7; background: var(--surface2);
+}
+.faq-item.open .faq-a { max-height: 300px; padding: 14px 16px; }
+
+/* ── PROGRESS DEMO ── */
+.progress-demo {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; margin: 12px 0;
+}
+.progress-bar-wrap { background: rgba(255,255,255,0.08); border-radius: 4px; height: 6px; margin: 8px 0; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s ease; }
+
+/* ── WIDGET PREVIEW ── */
+.widget-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+.widget-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 14px; cursor: pointer; transition: all 0.15s; text-align: center;
+}
+.widget-card:hover { border-color: rgba(124,58,237,0.4); transform: translateY(-2px); }
+.widget-card .wi { font-size: 24px; margin-bottom: 6px; }
+.widget-card .wn { font-size: 12px; color: var(--text); font-weight: 500; }
+.widget-card .wd { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+#no-resultados {
+  display: none; padding: 60px 20px; text-align: center;
+  color: var(--muted); font-size: 14px;
+}
+
+/* ── SIDEBAR FEATURE CARDS ── */
+.feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0; }
+.feature-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 16px; transition: all 0.15s; cursor: default;
+}
+.feature-card:hover { border-color: rgba(124,58,237,0.4); }
+.feature-card .fi { font-size: 22px; margin-bottom: 8px; }
+.feature-card .ft { font-size: 13px; color: white; font-weight: 500; margin-bottom: 4px; }
+.feature-card .fd { font-size: 12px; color: var(--muted); line-height: 1.5; }
 </style>
 </head>
 <body>
 
 <div id="topbar">
-  <button class="tb-btn" id="btn-back">←</button>
-  <div id="app-title">Atsuki<span>Browser</span> — Ayuda</div>
+  <button class="tb-btn" id="btn-back">← Atrás</button>
+  <div id="app-title">Atsuki<span>Browser</span> · Ayuda</div>
   <div id="search-wrap">
     <span id="search-icon">🔍</span>
     <input id="search-help" type="text" placeholder="Buscar en la ayuda..."/>
@@ -299,378 +288,397 @@ body {
 </div>
 
 <div id="body">
-  <!-- Sidebar nav -->
   <div id="sidebar">
-    <div class="nav-item active" data-sec="inicio">
-      <span class="nav-icon">🏠</span> Primeros pasos
+    <div class="nav-group">
+      <div class="nav-label">Primeros pasos</div>
+      <div class="nav-item active" data-sec="inicio"><span class="nav-icon">🏠</span> Bienvenida</div>
+      <div class="nav-item" data-sec="navegacion"><span class="nav-icon">🌐</span> Navegación</div>
+      <div class="nav-item" data-sec="pestanas"><span class="nav-icon">⊞</span> Pestañas</div>
     </div>
-    <div class="nav-item" data-sec="extensiones">
-      <span class="nav-icon">🧩</span> Extensiones
+    <div class="nav-group">
+      <div class="nav-label">Personalización</div>
+      <div class="nav-item" data-sec="nuevatab"><span class="nav-icon">✦</span> Nueva pestaña</div>
+      <div class="nav-item" data-sec="temas"><span class="nav-icon">🎨</span> Temas</div>
+      <div class="nav-item" data-sec="atajos"><span class="nav-icon">⌨</span> Atajos</div>
     </div>
-    <div class="nav-item" data-sec="perfiles">
-      <span class="nav-icon">👤</span> Perfiles
+    <div class="nav-group">
+      <div class="nav-label">Funciones</div>
+      <div class="nav-item" data-sec="musica"><span class="nav-icon">🎵</span> Música</div>
+      <div class="nav-item" data-sec="extensiones"><span class="nav-icon">🧩</span> Extensiones</div>
+      <div class="nav-item" data-sec="perfiles"><span class="nav-icon">👤</span> Perfiles</div>
     </div>
-    <div class="nav-item" data-sec="nuevatab">
-      <span class="nav-icon">⊞</span> Nueva pestaña
-    </div>
-    <div class="nav-item" data-sec="atajos">
-      <span class="nav-icon">⌨</span> Atajos de teclado
-    </div>
-    <div class="nav-item" data-sec="temas">
-      <span class="nav-icon">🎨</span> Temas
-    </div>
-    <div class="nav-item" data-sec="faq">
-      <span class="nav-icon">❓</span> Preguntas frecuentes
+    <div class="nav-group">
+      <div class="nav-label">Referencia</div>
+      <div class="nav-item" data-sec="faq"><span class="nav-icon">❓</span> Preguntas frecuentes</div>
     </div>
   </div>
 
-  <!-- Contenido -->
   <div id="content">
 
-    <!-- Primeros pasos -->
+    <!-- ── BIENVENIDA ── -->
     <div class="seccion activa" id="sec-inicio">
       <h1>Bienvenido a <span>AtsukiBrowser</span></h1>
-      <p class="subtitulo">Un navegador personal basado en Chromium, pensado para ser tuyo. Aquí encontrarás todo lo que necesitas para sacarle el máximo partido.</p>
+      <p class="subtitulo">Un navegador personal basado en Chromium, pensado para ser completamente tuyo. Explora las secciones o usa la búsqueda para encontrar lo que necesitas.</p>
 
       <h2>¿Qué puedes hacer?</h2>
-      <ul>
-        <li>Navegar con múltiples pestañas, grupos y previsualizaciones</li>
-        <li>Personalizar tu Nueva Pestaña con widgets arrastrables</li>
-        <li>Instalar extensiones propias (.atsuki) o de Chrome/Edge</li>
-        <li>Crear perfiles independientes con sus propios datos</li>
-        <li>Escuchar música desde el reproductor integrado</li>
-        <li>Tomar y editar capturas de pantalla con AtsukiClip</li>
-        <li>Editar documentos con AtsukiDocs</li>
-        <li>Explorar y aplicar wallpapers desde AtsukiWallpapers</li>
-      </ul>
-
-      <h2>Navegación básica</h2>
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-body">
-          <strong>Abrir una nueva pestaña</strong>
-          <span>Haz clic en el botón <kbd class="kbd">+</kbd> en la barra de pestañas, o usa <kbd class="kbd">Ctrl</kbd> + <kbd class="kbd">T</kbd>.</span>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="fi">⊞</div>
+          <div class="ft">Pestañas y grupos</div>
+          <div class="fd">Múltiples pestañas con previsualizaciones, grupos con colores y gestión avanzada.</div>
         </div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-body">
-          <strong>Buscar o navegar</strong>
-          <span>Escribe en la barra de dirección. Si es una URL navega directamente; si no, busca con tu motor predeterminado.</span>
+        <div class="feature-card">
+          <div class="fi">✦</div>
+          <div class="ft">Nueva Pestaña personalizable</div>
+          <div class="fd">Widgets arrastrables: reloj, música, clima, tareas, notas rápidas y más.</div>
         </div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-body">
-          <strong>Acceder a las herramientas</strong>
-          <span>Usa el sidebar izquierdo para acceder a Favoritos, Historial, Descargas, Capturas y más.</span>
+        <div class="feature-card">
+          <div class="fi">🎨</div>
+          <div class="ft">Temas y apariencia</div>
+          <div class="fd">Temas predefinidos y editor personalizado con colores, fuentes y wallpapers.</div>
         </div>
-      </div>
-
-      <div class="tip-box">
-        <strong>💡 Tip:</strong> Puedes hacer clic derecho en cualquier página para acceder al menú contextual personalizado de AtsukiBrowser con opciones adicionales.
-      </div>
-    </div>
-
-    <!-- Extensiones -->
-    <div class="seccion" id="sec-extensiones">
-      <h1><span>Extensiones</span></h1>
-      <p class="subtitulo">AtsukiBrowser soporta dos tipos de extensiones: las propias (.atsuki) y las de Chrome/Edge desempaquetadas.</p>
-
-      <h2>Extensiones .atsuki</h2>
-      <p>Son extensiones nativas del navegador. Se instalan desde un archivo <kbd class="kbd">.atsuki</kbd> y se inyectan en todas las páginas como scripts.</p>
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-body">
-          <strong>Instalar una extensión .atsuki</strong>
-          <span>Ve a Extensiones → haz clic en <strong>+ Instalar .atsuki</strong> → selecciona el archivo.</span>
+        <div class="feature-card">
+          <div class="fi">🎵</div>
+          <div class="ft">Reproductor de música</div>
+          <div class="fd">Reproduce archivos locales o streams en segundo plano mientras navegas.</div>
         </div>
-      </div>
-
-      <h2>Extensiones Chrome/Edge</h2>
-      <p>Puedes instalar extensiones de Chrome o Edge en formato desempaquetado. Esto requiere descargar la extensión manualmente.</p>
-
-      <div class="warn-box">
-        <strong>⚠ Importante:</strong> AtsukiBrowser no puede instalar extensiones directamente desde la Chrome Web Store ni desde la tienda de Edge. Esto es una limitación de WebView2 y no tiene solución directa. Las extensiones deben instalarse en formato desempaquetado.
-      </div>
-
-      <h2>¿Cómo descargar una extensión desempaquetada?</h2>
-      <p>Hay varias formas de obtener una extensión en formato desempaquetado:</p>
-
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-body">
-          <strong>Desde CRX Extractor (recomendado)</strong>
-          <span>Ve a <strong>crxextractor.com</strong>, pega la URL de la extensión de la Chrome Web Store y descarga el archivo. Luego extrae el ZIP — la carpeta resultante es la extensión desempaquetada.</span>
+        <div class="feature-card">
+          <div class="fi">🧩</div>
+          <div class="ft">Extensiones</div>
+          <div class="fd">Extensiones nativas .atsuki y soporte para extensiones de Chrome/Edge desempaquetadas.</div>
         </div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-body">
-          <strong>Desde GitHub</strong>
-          <span>Muchas extensiones populares tienen su código en GitHub. Descarga el repositorio como ZIP, extráelo y busca la carpeta que contiene el <kbd class="kbd">manifest.json</kbd>.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-body">
-          <strong>Desde Chrome/Edge instalado</strong>
-          <span>Si ya tienes la extensión en Chrome o Edge, ve a <kbd class="kbd">chrome://extensions</kbd>, activa el modo desarrollador y copia la ruta de la extensión desde su ID. Generalmente está en <kbd class="kbd">%LocalAppData%\Google\Chrome\User Data\Default\Extensions\</kbd>.</span>
-        </div>
-      </div>
-
-      <h2>Instalar la extensión desempaquetada</h2>
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-body">
-          <strong>Abrir Extensiones</strong>
-          <span>Ve al sidebar → Extensiones, o accede desde Ajustes.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-body">
-          <strong>Instalar Chrome/Edge</strong>
-          <span>Haz clic en <strong>+ Instalar Chrome/Edge</strong> y selecciona el archivo <kbd class="kbd">manifest.json</kbd> dentro de la carpeta de la extensión.</span>
-        </div>
-      </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-body">
-          <strong>Listo</strong>
-          <span>La extensión se instala y activa automáticamente en todas las pestañas abiertas.</span>
+        <div class="feature-card">
+          <div class="fi">👤</div>
+          <div class="ft">Perfiles independientes</div>
+          <div class="fd">Cada perfil tiene su propio historial, favoritos, extensiones y configuración.</div>
         </div>
       </div>
 
       <div class="tip-box">
-        <strong>💡 Tip:</strong> Si una extensión tiene página de opciones, aparecerá el botón <strong>Opciones</strong> en su tarjeta dentro de la página de Extensiones.
+        <strong>💡 Tip:</strong> Puedes acceder a todas las páginas internas del navegador escribiendo <kbd class="kbd">atsuki://</kbd> en la barra de dirección — por ejemplo <kbd class="kbd">atsuki://ajustes</kbd>, <kbd class="kbd">atsuki://favoritos</kbd>, <kbd class="kbd">atsuki://extensiones</kbd>.
       </div>
     </div>
 
-    <!-- Perfiles -->
-    <div class="seccion" id="sec-perfiles">
-      <h1><span>Perfiles</span></h1>
-      <p class="subtitulo">Los perfiles te permiten tener múltiples entornos completamente independientes — cada uno con su propio historial, favoritos, extensiones y configuración.</p>
+    <!-- ── NAVEGACIÓN ── -->
+    <div class="seccion" id="sec-navegacion">
+      <h1>Navegación <span>básica</span></h1>
+      <p class="subtitulo">Cómo moverte, buscar y usar la barra de dirección de AtsukiBrowser.</p>
 
-      <h2>Crear un perfil</h2>
-      <div class="step">
-        <div class="step-num">1</div>
-        <div class="step-body">
-          <strong>Ir a Perfiles</strong>
-          <span>Haz clic en tu avatar en la esquina superior derecha, o ve a Ajustes → Perfiles.</span>
+      <h2>La barra de dirección</h2>
+      <div class="demo-browser">
+        <div class="demo-titlebar">
+          <div class="demo-dots"><div class="demo-dot r"></div><div class="demo-dot y"></div><div class="demo-dot g"></div></div>
+          <div class="demo-urlbar" id="demo-url-display">Buscar o escribir una URL...</div>
+        </div>
+        <div class="demo-body" style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <button class="demo-btn" onclick="demoUrl('youtube.com')">🌐 URL directa</button>
+          <button class="demo-btn" onclick="demoUrl('cómo hacer pasta')">🔍 Búsqueda</button>
+          <button class="demo-btn" onclick="demoUrl('atsuki://ajustes')">⚙ Página interna</button>
         </div>
       </div>
-      <div class="step">
-        <div class="step-num">2</div>
-        <div class="step-body">
-          <strong>Crear nuevo perfil</strong>
-          <span>Haz clic en <strong>+ Nuevo perfil</strong>, elige un nombre, emoji o foto.</span>
+      <p>Si escribes una <strong>URL directa</strong> (con dominio y TLD), navega a ella automáticamente. Si escribes cualquier otra cosa, busca con tu motor predeterminado.</p>
+
+      <h2>Menú contextual</h2>
+      <p>Haz clic derecho en cualquier página para acceder al menú contextual personalizado. Incluye opciones según el contexto:</p>
+      <div style="display:flex; flex-direction:column; gap:6px; margin:12px 0;">
+        <div class="step"><div class="step-num">🖼</div><div class="step-body"><strong>Sobre una imagen</strong><span>Guardar, copiar, abrir en nueva pestaña o buscar con Google Lens.</span></div></div>
+        <div class="step"><div class="step-num">🔗</div><div class="step-body"><strong>Sobre un enlace</strong><span>Abrir en nueva pestaña, nueva ventana o copiar URL.</span></div></div>
+        <div class="step"><div class="step-num">📺</div><div class="step-body"><strong>Sobre un video</strong><span>Activar Picture in Picture para ver el video flotante mientras navegas.</span></div></div>
+        <div class="step"><div class="step-num">📋</div><div class="step-body"><strong>Sobre texto seleccionado</strong><span>Copiar, buscar o copiar como Markdown.</span></div></div>
+      </div>
+
+      <h2>Zoom</h2>
+      <div class="progress-demo">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <span style="font-size:12px; color:var(--muted)">Zoom de página</span>
+          <span id="zoom-demo-val" style="font-size:13px; color:var(--accent2); font-weight:600;">100%</span>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar" id="zoom-demo-bar" style="width:50%"></div></div>
+        <div style="display:flex; gap:8px; margin-top:10px;">
+          <button class="demo-btn" onclick="ajustarZoom(-10)">Ctrl −</button>
+          <button class="demo-btn" onclick="ajustarZoom(0)">Ctrl 0</button>
+          <button class="demo-btn" onclick="ajustarZoom(10)">Ctrl +</button>
         </div>
       </div>
-      <div class="step">
-        <div class="step-num">3</div>
-        <div class="step-body">
-          <strong>Cambiar de perfil</strong>
-          <span>Al cambiar de perfil se abrirá una nueva instancia del navegador con ese perfil activo.</span>
+      <p>El zoom se guarda automáticamente por dominio — si ajustas el zoom en YouTube, recordará tu preferencia la próxima vez que entres.</p>
+    </div>
+
+    <!-- ── PESTAÑAS ── -->
+    <div class="seccion" id="sec-pestanas">
+      <h1>Gestión de <span>pestañas</span></h1>
+      <p class="subtitulo">AtsukiBrowser tiene un sistema de pestañas avanzado con grupos, previsualizaciones y más.</p>
+
+      <h2>Demo interactivo de pestañas</h2>
+      <div class="demo-browser">
+        <div style="background:#0a0a14; border-bottom:1px solid var(--border);">
+          <div class="demo-tabs" id="demo-tabs-bar">
+            <div class="demo-tab active" data-idx="0">🏠 Nueva pestaña <span class="demo-x">×</span></div>
+            <div class="demo-tab inactive" data-idx="1">▶ YouTube <span class="demo-x">×</span></div>
+            <div class="demo-tab-add" id="demo-tab-add">+</div>
+          </div>
+        </div>
+        <div class="demo-body" style="font-size:12px; color:var(--muted); min-height:80px; display:flex; align-items:center; justify-content:center;">
+          <span id="demo-tab-content">Nueva pestaña — haz click en las pestañas o en + para probar</span>
         </div>
       </div>
 
-      <h2>Modo Invitado</h2>
-      <p>El modo invitado abre una sesión temporal sin guardar nada — historial, cookies y datos se eliminan al cerrar.</p>
+      <h2>Grupos de pestañas</h2>
+      <p>Puedes agrupar pestañas relacionadas para mantener el orden. Cada grupo tiene su propio color e icono.</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;">
+        <div style="padding:4px 12px; border-radius:20px; background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.4); font-size:12px; color:#fca5a5;">🔴 Trabajo</div>
+        <div style="padding:4px 12px; border-radius:20px; background:rgba(59,130,246,0.2); border:1px solid rgba(59,130,246,0.4); font-size:12px; color:#93c5fd;">🔵 Personal</div>
+        <div style="padding:4px 12px; border-radius:20px; background:rgba(34,197,94,0.2); border:1px solid rgba(34,197,94,0.4); font-size:12px; color:#86efac;">🟢 Estudio</div>
+        <div style="padding:4px 12px; border-radius:20px; background:rgba(168,85,247,0.2); border:1px solid rgba(168,85,247,0.4); font-size:12px; color:#d8b4fe;">🟣 Ocio</div>
+      </div>
 
-      <div class="warn-box">
-        <strong>⚠ Nota:</strong> Cada perfil abierto es una instancia separada del navegador. No puedes tener dos perfiles en la misma ventana simultáneamente.
+      <h2>Atajos de pestañas</h2>
+      <div class="atajos-grid" id="atajos-tabs"></div>
+
+      <div class="tip-box">
+        <strong>💡 Tip:</strong> Pasa el cursor sobre una pestaña para ver una previsualización en miniatura. Mantén el cursor para que se mantenga visible.
       </div>
     </div>
 
-    <!-- Nueva pestaña -->
+    <!-- ── NUEVA PESTAÑA ── -->
     <div class="seccion" id="sec-nuevatab">
       <h1>Nueva <span>Pestaña</span></h1>
       <p class="subtitulo">AtsukiBrowser tiene dos versiones de la Nueva Pestaña. Puedes cambiar entre ellas desde Ajustes → Apariencia.</p>
 
-      <h2>Nueva Pestaña V1</h2>
-      <p>Layout clásico con reloj, barra de búsqueda, accesos directos y widgets fijos. Simple y rápido.</p>
+      <h2>Nueva Pestaña V1 — Clásica</h2>
+      <p>Layout fijo con reloj, barra de búsqueda, accesos directos y widgets predefinidos.</p>
 
-      <h2>Nueva Pestaña V2</h2>
-      <p>Layout libre con widgets arrastrables sobre una cuadrícula. Puedes añadir, quitar y reposicionar cada widget.</p>
-      <ul>
-        <li>Haz clic en <strong>＋</strong> para añadir widgets</li>
-        <li>Arrastra cualquier widget para reposicionarlo — la cuadrícula aparece automáticamente</li>
-        <li>Los widgets disponibles son: Reloj, Búsqueda, Accesos directos, Música, Rendimiento, Pomodoro y Tareas</li>
-        <li>El layout se guarda automáticamente</li>
-      </ul>
+      <h2>Nueva Pestaña V2 — Libre</h2>
+      <p>Layout de widgets arrastrables sobre una cuadrícula. Añade, quita y reposiciona cada widget.</p>
+
+      <h2>Widgets disponibles</h2>
+      <div class="widget-grid">
+        <div class="widget-card"><div class="wi">🕐</div><div class="wn">Reloj</div><div class="wd">Hora y fecha en tiempo real</div></div>
+        <div class="widget-card"><div class="wi">🔍</div><div class="wn">Búsqueda</div><div class="wd">Barra de búsqueda rápida</div></div>
+        <div class="widget-card"><div class="wi">⭐</div><div class="wn">Accesos directos</div><div class="wd">Sitios favoritos con un clic</div></div>
+        <div class="widget-card"><div class="wi">🎵</div><div class="wn">Música</div><div class="wd">Control de reproducción</div></div>
+        <div class="widget-card"><div class="wi">⚡</div><div class="wn">Rendimiento</div><div class="wd">CPU, RAM, disco y red</div></div>
+        <div class="widget-card"><div class="wi">🍅</div><div class="wn">Pomodoro</div><div class="wd">Temporizador de trabajo</div></div>
+        <div class="widget-card"><div class="wi">✅</div><div class="wn">Tareas</div><div class="wd">Lista de tareas rápidas</div></div>
+        <div class="widget-card"><div class="wi">🌤</div><div class="wn">Clima</div><div class="wd">Tiempo actual de tu ciudad</div></div>
+        <div class="widget-card"><div class="wi">📝</div><div class="wn">Notas rápidas</div><div class="wd">Bloc de notas instantáneo</div></div>
+      </div>
 
       <div class="tip-box">
-        <strong>💡 Tip:</strong> Puedes aplicar un fondo personalizado desde <strong>AtsukiWallpapers</strong> — explora miles de wallpapers y aplícalos con un clic.
+        <strong>💡 Tip:</strong> Puedes aplicar un fondo personalizado desde <strong>AtsukiWallpapers</strong> — explora miles de wallpapers y aplícalos con un clic. También puedes arrastrar una imagen directamente a la Nueva Pestaña.
       </div>
     </div>
 
-    <!-- Atajos -->
+    <!-- ── TEMAS ── -->
+    <div class="seccion" id="sec-temas">
+      <h1><span>Temas</span> y apariencia</h1>
+      <p class="subtitulo">Personaliza los colores del navegador desde Ajustes → Apariencia. Los cambios se aplican en tiempo real.</p>
+
+      <h2>Temas predefinidos — click para previsualizar</h2>
+      <div class="theme-grid" id="theme-grid-demo"></div>
+
+      <h2>Colores del tema personalizado</h2>
+      <div style="background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; margin:12px 0;">
+        <div class="color-row">
+          <div class="color-swatch" style="background:var(--accent)"></div>
+          <div><div class="color-label">Acento</div><div class="color-desc">Botones, bordes activos y elementos destacados</div></div>
+        </div>
+        <div class="color-row">
+          <div class="color-swatch" style="background:var(--bg)"></div>
+          <div><div class="color-label">Fondo</div><div class="color-desc">Color base de fondo del navegador</div></div>
+        </div>
+        <div class="color-row">
+          <div class="color-swatch" style="background:var(--surface)"></div>
+          <div><div class="color-label">Superficie</div><div class="color-desc">Paneles, sidebars y tarjetas</div></div>
+        </div>
+        <div class="color-row">
+          <div class="color-swatch" style="background:var(--surface2)"></div>
+          <div><div class="color-label">Superficie 2</div><div class="color-desc">Elementos secundarios dentro de paneles</div></div>
+        </div>
+      </div>
+
+      <div class="tip-box">
+        <strong>💡 Tip:</strong> Los temas se aplican en tiempo real a todas las páginas internas — Nueva Pestaña, Ajustes, Extensiones y todas las apps integradas como AtsukiDraw y AtsukiDocs.
+      </div>
+    </div>
+
+    <!-- ── ATAJOS ── -->
     <div class="seccion" id="sec-atajos">
       <h1>Atajos de <span>teclado</span></h1>
-      <p class="subtitulo">Los atajos más comunes. Puedes personalizar la mayoría desde Ajustes → Atajos.</p>
+      <p class="subtitulo">Presiona cualquier atajo en tu teclado para verlo resaltado. Puedes personalizar la mayoría desde Ajustes → Atajos.</p>
+
+      <div class="info-box">
+        <strong>✨ Interactivo:</strong> Prueba presionar los atajos ahora mismo — se resaltarán en la lista.
+      </div>
 
       <h2>Pestañas</h2>
-      <div class="atajos-grid">
-        <div class="atajo-item">
-          <span class="atajo-desc">Nueva pestaña</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">T</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Cerrar pestaña</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">W</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Pestaña siguiente</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">Tab</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Pestaña anterior</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">Shift</kbd><kbd class="kbd">Tab</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Reabrir pestaña cerrada</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">Shift</kbd><kbd class="kbd">T</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Ir a pestaña 1-8</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">1-8</kbd></div>
-        </div>
-      </div>
-
+      <div class="atajos-grid" id="atajos-grid-tabs"></div>
       <h2>Navegación</h2>
-      <div class="atajos-grid">
-        <div class="atajo-item">
-          <span class="atajo-desc">Barra de dirección</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">L</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Recargar página</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">R</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Recargar sin caché</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">Shift</kbd><kbd class="kbd">R</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Atrás</span>
-          <div class="atajo-keys"><kbd class="kbd">Alt</kbd><kbd class="kbd">←</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Adelante</span>
-          <div class="atajo-keys"><kbd class="kbd">Alt</kbd><kbd class="kbd">→</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Captura de pantalla</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">Shift</kbd><kbd class="kbd">S</kbd></div>
-        </div>
-      </div>
-
-      <h2>Página</h2>
-      <div class="atajos-grid">
-        <div class="atajo-item">
-          <span class="atajo-desc">Zoom +</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">+</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Zoom −</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">−</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Zoom restablecer</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">0</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Buscar en página</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">F</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">Guardar página</span>
-          <div class="atajo-keys"><kbd class="kbd">Ctrl</kbd><kbd class="kbd">S</kbd></div>
-        </div>
-        <div class="atajo-item">
-          <span class="atajo-desc">DevTools</span>
-          <div class="atajo-keys"><kbd class="kbd">F12</kbd></div>
-        </div>
-      </div>
+      <div class="atajos-grid" id="atajos-grid-nav"></div>
+      <h2>Herramientas</h2>
+      <div class="atajos-grid" id="atajos-grid-tools"></div>
     </div>
 
-    <!-- Temas -->
-    <div class="seccion" id="sec-temas">
-      <h1><span>Temas</span></h1>
-      <p class="subtitulo">Personaliza los colores del navegador desde Ajustes → Apariencia.</p>
+    <!-- ── MÚSICA ── -->
+    <div class="seccion" id="sec-musica">
+      <h1>Reproductor de <span>música</span></h1>
+      <p class="subtitulo">AtsukiBrowser incluye un reproductor de música integrado que funciona en segundo plano mientras navegas.</p>
 
-      <h2>Temas predefinidos</h2>
-      <p>AtsukiBrowser incluye varios temas predefinidos que puedes aplicar con un clic desde la sección de Apariencia en Ajustes.</p>
+      <h2>¿Cómo usar el reproductor?</h2>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Abrir el panel de música</strong><span>Haz clic en el icono 🎵 en el sidebar izquierdo.</span></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Agregar canciones</strong><span>Usa <strong>+ Archivo</strong> para agregar archivos locales (MP3, FLAC, WAV, OGG, AAC) o introduce una URL de stream en el campo de texto.</span></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Crear playlists</strong><span>Haz clic en <strong>+ Lista</strong> para crear una nueva playlist. Puedes añadirle una imagen con clic derecho en su pestaña.</span></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-body"><strong>Reproducir</strong><span>Haz clic en cualquier canción de la lista para reproducirla. El reproductor sigue funcionando aunque cambies de pestaña.</span></div></div>
 
-      <h2>Tema personalizado</h2>
-      <p>Puedes crear tu propio tema definiendo los colores de acento, fondo, superficie y superficie secundaria.</p>
-      <ul>
-        <li><strong>Acento</strong> — color principal usado en botones, bordes y elementos activos</li>
-        <li><strong>Fondo</strong> — color de fondo general del navegador</li>
-        <li><strong>Superficie</strong> — color de paneles y tarjetas</li>
-        <li><strong>Superficie 2</strong> — color de elementos secundarios dentro de paneles</li>
-      </ul>
+      <h2>Funciones del reproductor</h2>
+      <div class="feature-grid">
+        <div class="feature-card"><div class="fi">🔀</div><div class="ft">Shuffle</div><div class="fd">Reproduce las canciones en orden aleatorio.</div></div>
+        <div class="feature-card"><div class="fi">🔁</div><div class="ft">Repetir</div><div class="fd">Repite la playlist completa o una sola canción.</div></div>
+        <div class="feature-card"><div class="fi">⚡</div><div class="ft">Aleatorio</div><div class="fd">Salta a una canción aleatoria de cualquier playlist.</div></div>
+        <div class="feature-card"><div class="fi">📤</div><div class="ft">Exportar/Importar</div><div class="fd">Guarda y carga tus playlists en formato JSON.</div></div>
+      </div>
 
       <div class="tip-box">
-        <strong>💡 Tip:</strong> Los temas se aplican en tiempo real a todas las páginas internas del navegador incluyendo la Nueva Pestaña, Ajustes, Extensiones y todas las apps integradas.
+        <strong>💡 Tip:</strong> El widget de reproducción en la Nueva Pestaña muestra y controla lo que esté sonando — tanto el reproductor interno como YouTube u otras apps del sistema.
       </div>
-
-      <h2>Fondo de Nueva Pestaña</h2>
-      <p>Puedes establecer una imagen de fondo para la Nueva Pestaña de tres formas:</p>
-      <ul>
-        <li>Desde <strong>AtsukiWallpapers</strong> — explora y aplica wallpapers de Wallhaven</li>
-        <li>Desde <strong>Ajustes → Apariencia</strong> — elige una imagen local desde tu equipo</li>
-        <li>Arrastrando una imagen directamente a la Nueva Pestaña</li>
-      </ul>
     </div>
 
-    <!-- FAQ -->
+    <!-- ── EXTENSIONES ── -->
+    <div class="seccion" id="sec-extensiones">
+      <h1><span>Extensiones</span></h1>
+      <p class="subtitulo">AtsukiBrowser soporta extensiones nativas (.atsuki) y extensiones de Chrome/Edge en formato desempaquetado.</p>
+
+      <h2>Tipos de extensiones</h2>
+      <div class="feature-grid">
+        <div class="feature-card">
+          <div class="fi">🟣</div>
+          <div class="ft">Extensiones .atsuki</div>
+          <div class="fd">Nativas del navegador. Se instalan desde un archivo .atsuki y se inyectan como scripts en todas las páginas.</div>
+        </div>
+        <div class="feature-card">
+          <div class="fi">🔵</div>
+          <div class="ft">Chrome / Edge</div>
+          <div class="fd">Extensiones desempaquetadas con manifest.json. Requieren descarga manual desde fuentes externas.</div>
+        </div>
+      </div>
+
+      <h2>Instalar extensión .atsuki</h2>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Ir a Extensiones</strong><span>Haz clic en el icono 🧩 del sidebar o escribe <kbd class="kbd">atsuki://extensiones</kbd>.</span></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Instalar</strong><span>Haz clic en <strong>+ Instalar .atsuki</strong> y selecciona el archivo.</span></div></div>
+
+      <h2>Instalar extensión Chrome/Edge desempaquetada</h2>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Obtener la extensión</strong><span>Descarga desde <strong>crxextractor.com</strong> pegando la URL de la Chrome Web Store, o desde GitHub si tiene el código disponible.</span></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Extraer el ZIP</strong><span>Extrae el archivo descargado. La carpeta resultante con el <kbd class="kbd">manifest.json</kbd> es la extensión desempaquetada.</span></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Instalar en AtsukiBrowser</strong><span>En la página de Extensiones, haz clic en <strong>+ Instalar Chrome/Edge</strong> y selecciona el <kbd class="kbd">manifest.json</kbd>.</span></div></div>
+
+      <div class="warn-box">
+        <strong>⚠ Importante:</strong> AtsukiBrowser no puede instalar extensiones directamente desde la Chrome Web Store — es una limitación de WebView2. Las extensiones deben instalarse en formato desempaquetado.
+      </div>
+    </div>
+
+    <!-- ── PERFILES ── -->
+    <div class="seccion" id="sec-perfiles">
+      <h1><span>Perfiles</span></h1>
+      <p class="subtitulo">Los perfiles te permiten tener múltiples entornos completamente independientes, cada uno con sus propios datos y configuración.</p>
+
+      <h2>¿Qué tiene cada perfil?</h2>
+      <div class="feature-grid">
+        <div class="feature-card"><div class="fi">🕐</div><div class="ft">Historial propio</div><div class="fd">Cada perfil guarda su propio historial de navegación.</div></div>
+        <div class="feature-card"><div class="fi">⭐</div><div class="ft">Favoritos</div><div class="fd">Los favoritos son independientes por perfil.</div></div>
+        <div class="feature-card"><div class="fi">🧩</div><div class="ft">Extensiones</div><div class="fd">Instala diferentes extensiones para cada perfil.</div></div>
+        <div class="feature-card"><div class="fi">🎨</div><div class="ft">Tema y ajustes</div><div class="fd">Cada perfil tiene su propia configuración visual.</div></div>
+      </div>
+
+      <h2>Crear un perfil</h2>
+      <div class="step"><div class="step-num">1</div><div class="step-body"><strong>Abrir Perfiles</strong><span>Haz clic en tu avatar en la esquina superior derecha del navegador.</span></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-body"><strong>Nuevo perfil</strong><span>Haz clic en <strong>+ Nuevo perfil</strong> y elige nombre, emoji o foto.</span></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-body"><strong>Cambiar</strong><span>Al seleccionar un perfil distinto se abre una nueva instancia del navegador con ese perfil.</span></div></div>
+
+      <h2>Modo Invitado</h2>
+      <p>Abre una sesión temporal sin guardar nada — historial, cookies y todos los datos se eliminan automáticamente al cerrar la ventana.</p>
+
+      <div class="warn-box">
+        <strong>⚠ Nota:</strong> Cada perfil es una instancia separada del navegador. No puedes tener dos perfiles en la misma ventana simultáneamente.
+      </div>
+    </div>
+
+    <!-- ── FAQ ── -->
     <div class="seccion" id="sec-faq">
       <h1>Preguntas <span>frecuentes</span></h1>
-      <p class="subtitulo">Las dudas más comunes sobre AtsukiBrowser.</p>
+      <p class="subtitulo">Las dudas más comunes sobre AtsukiBrowser. Haz clic para expandir.</p>
 
-      <h2>¿Por qué no puedo instalar extensiones directamente desde la Chrome Web Store?</h2>
-      <p>AtsukiBrowser está basado en WebView2, que no es reconocido por la Chrome Web Store como un navegador compatible. Esta es una limitación técnica de la plataforma. La alternativa es instalar extensiones en formato desempaquetado — consulta la sección de <strong>Extensiones</strong> para ver cómo hacerlo.</p>
-
-      <h2>¿Mis datos están sincronizados entre dispositivos?</h2>
-      <p>Actualmente AtsukiBrowser no tiene sincronización en la nube. Todos los datos (historial, favoritos, extensiones) se guardan localmente en tu equipo.</p>
-
-      <h2>¿Puedo usar varios perfiles al mismo tiempo?</h2>
-      <p>Sí. Cada perfil abre su propia instancia del navegador. Puedes tener múltiples instancias corriendo simultáneamente, cada una con un perfil diferente.</p>
-
-      <h2>¿Cómo hago una copia de seguridad de mis datos?</h2>
-      <p>Ve a Ajustes → Datos y respaldo. Desde ahí puedes exportar todos tus datos a un archivo de respaldo e importarlos cuando lo necesites.</p>
-
-      <h2>¿Dónde se guardan mis datos?</h2>
-      <p>En <kbd class="kbd">%LocalAppData%\AtsukiBrowser\perfiles\</kbd> — cada perfil tiene su propia carpeta con todos sus datos.</p>
-
-      <h2>¿AtsukiBrowser tiene actualizaciones automáticas?</h2>
-      <p>Sí. El navegador verifica actualizaciones automáticamente. Puedes ver el estado y cambiar entre canal estable y preview desde Ajustes → Actualizaciones.</p>
+      <div id="faq-lista"></div>
     </div>
 
     <div id="no-resultados">
+      <div style="font-size:32px; margin-bottom:12px;">🔍</div>
       No se encontraron resultados para tu búsqueda.
     </div>
   </div>
 </div>
 
 <script>
-// ── Navegación entre secciones ──
-const secciones = {
-  inicio:      'sec-inicio',
-  extensiones: 'sec-extensiones',
-  perfiles:    'sec-perfiles',
-  nuevatab:    'sec-nuevatab',
-  atajos:      'sec-atajos',
-  temas:       'sec-temas',
-  faq:         'sec-faq'
+// ── DATOS ──────────────────────────────────────────────
+const TEMAS = [
+  { nombre:'Atsuki',    accent:'#7c3aed', bg:'#0d0d14', surface:'#13131f', surface2:'#1a1a2e' },
+  { nombre:'Aurora',    accent:'#06b6d4', bg:'#040d14', surface:'#0a1628', surface2:'#0f2040' },
+  { nombre:'Sakura',    accent:'#ec4899', bg:'#14080f', surface:'#1f0d18', surface2:'#2a1020' },
+  { nombre:'Forest',    accent:'#22c55e', bg:'#080f09', surface:'#0d1a0e', surface2:'#122014' },
+  { nombre:'Sunset',    accent:'#f97316', bg:'#110a04', surface:'#1a1008', surface2:'#201508' },
+  { nombre:'Arctic',    accent:'#94a3b8', bg:'#080a10', surface:'#10131e', surface2:'#161928' },
+  { nombre:'Crimson',   accent:'#ef4444', bg:'#100808', surface:'#1a0e0e', surface2:'#201010' },
+  { nombre:'Mono',      accent:'#e2e8f0', bg:'#0a0a0a', surface:'#141414', surface2:'#1e1e1e' },
+];
+
+const ATAJOS = {
+  tabs: [
+    { desc:'Nueva pestaña',          keys:['Ctrl','T'] },
+    { desc:'Cerrar pestaña',         keys:['Ctrl','W'] },
+    { desc:'Pestaña siguiente',      keys:['Ctrl','Tab'] },
+    { desc:'Pestaña anterior',       keys:['Ctrl','Shift','Tab'] },
+    { desc:'Reabrir cerrada',        keys:['Ctrl','Shift','T'] },
+    { desc:'Ir a pestaña 1-8',       keys:['Ctrl','1-8'] },
+  ],
+  nav: [
+    { desc:'Barra de dirección',     keys:['Ctrl','L'] },
+    { desc:'Recargar',               keys:['Ctrl','R'] },
+    { desc:'Recargar sin caché',     keys:['Ctrl','Shift','R'] },
+    { desc:'Atrás',                  keys:['Alt','←'] },
+    { desc:'Adelante',               keys:['Alt','→'] },
+    { desc:'Zoom +',                 keys:['Ctrl','+'] },
+    { desc:'Zoom −',                 keys:['Ctrl','−'] },
+    { desc:'Zoom restablecer',       keys:['Ctrl','0'] },
+  ],
+  tools: [
+    { desc:'Favoritos',              keys:['Ctrl','D'] },
+    { desc:'Historial',              keys:['Ctrl','H'] },
+    { desc:'Descargas',              keys:['Ctrl','J'] },
+    { desc:'Búsqueda rápida',        keys:['Ctrl','Shift','F'] },
+    { desc:'Captura de pantalla',    keys:['Ctrl','Shift','S'] },
+    { desc:'Picture in Picture',     keys:['Ctrl','Shift','P'] },
+    { desc:'DevTools',               keys:['F12'] },
+    { desc:'Modo Zen',               keys:['Ctrl','Shift','Z'] },
+  ],
 };
+
+const FAQ = [
+  { q:'¿Por qué no puedo instalar extensiones desde la Chrome Web Store?', a:'AtsukiBrowser está basado en WebView2, que no es reconocido por la Chrome Web Store como navegador compatible. Es una limitación técnica. La alternativa es instalar extensiones en formato desempaquetado — consulta la sección Extensiones para ver cómo.' },
+  { q:'¿Mis datos se sincronizan entre dispositivos?', a:'Actualmente no hay sincronización en la nube. Todos los datos (historial, favoritos, extensiones, playlists) se guardan localmente en tu equipo. Puedes exportarlos desde Ajustes → Datos y respaldo.' },
+  { q:'¿Puedo usar varios perfiles al mismo tiempo?', a:'Sí. Cada perfil abre su propia instancia del navegador. Puedes tener múltiples instancias corriendo a la vez, cada una con un perfil diferente.' },
+  { q:'¿Cómo hago una copia de seguridad?', a:'Ve a Ajustes → Datos y respaldo. Desde ahí puedes exportar todos tus datos a un archivo de respaldo e importarlos cuando lo necesites.' },
+  { q:'¿Dónde se guardan mis datos?', a:'En %LocalAppData%\\AtsukiBrowser\\perfiles\\ — cada perfil tiene su propia carpeta con todos sus datos independientes.' },
+  { q:'¿AtsukiBrowser tiene actualizaciones automáticas?', a:'Sí. El navegador verifica actualizaciones automáticamente al iniciarse. Puedes ver el estado y cambiar entre canal estable y preview desde Ajustes → Actualizaciones.' },
+  { q:'¿Cómo activo el modo oscuro en páginas web?', a:'Puedes instalar una extensión como Dark Reader en formato desempaquetado desde la sección de Extensiones. AtsukiBrowser no modifica el contenido de páginas web por defecto.' },
+  { q:'¿Por qué algunos sitios muestran "No hay resultados"?', a:'Algunos sitios requieren que aceptes cookies de consentimiento para mostrar contenido. AtsukiBrowser tiene un sistema de auto-aceptado de cookies que puedes configurar en Ajustes → Cookies.' },
+];
+
+// ── NAVEGACIÓN ──────────────────────────────────────────
+const SECCIONES = ['inicio','navegacion','pestanas','nuevatab','temas','atajos','musica','extensiones','perfiles','faq'];
 
 function mostrarSeccion(id) {
   document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activa'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.getElementById(secciones[id])?.classList.add('activa');
+  const sec = document.getElementById('sec-' + id);
+  if (sec) sec.classList.add('activa');
   document.querySelector(`[data-sec="${id}"]`)?.classList.add('active');
   document.getElementById('no-resultados').style.display = 'none';
   document.getElementById('content').scrollTop = 0;
@@ -680,42 +688,165 @@ document.querySelectorAll('.nav-item').forEach(item => {
   item.addEventListener('click', () => mostrarSeccion(item.dataset.sec));
 });
 
-// ── Búsqueda ──
+// ── BÚSQUEDA ─────────────────────────────────────────────
 document.getElementById('search-help').addEventListener('input', e => {
   const q = e.target.value.trim().toLowerCase();
-  if (!q) {
-    mostrarSeccion('inicio');
-    return;
-  }
-
+  if (!q) { mostrarSeccion('inicio'); return; }
   let encontrado = false;
   document.querySelectorAll('.seccion').forEach(sec => {
-    const texto = sec.textContent.toLowerCase();
-    if (texto.includes(q)) {
-      sec.classList.add('activa');
-      encontrado = true;
-    } else {
-      sec.classList.remove('activa');
-    }
+    const match = sec.textContent.toLowerCase().includes(q);
+    sec.classList.toggle('activa', match);
+    if (match) encontrado = true;
   });
-
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById('no-resultados').style.display = encontrado ? 'none' : 'block';
 });
 
-// ── Tema ──
+// ── DEMO URL ─────────────────────────────────────────────
+let zoomVal = 100;
+function demoUrl(txt) {
+  const el = document.getElementById('demo-url-display');
+  el.style.color = 'var(--accent2)';
+  if (txt.startsWith('atsuki://')) {
+    el.textContent = txt;
+    setTimeout(() => { el.textContent = txt + ' ← Página interna'; el.style.color = 'var(--muted)'; }, 800);
+  } else if (txt.includes('.')) {
+    el.textContent = 'https://' + txt;
+    setTimeout(() => { el.style.color = 'var(--muted)'; }, 800);
+  } else {
+    el.textContent = 'https://www.google.com/search?q=' + encodeURIComponent(txt);
+    setTimeout(() => { el.style.color = 'var(--muted)'; }, 800);
+  }
+}
+
+function ajustarZoom(delta) {
+  if (delta === 0) zoomVal = 100;
+  else zoomVal = Math.max(25, Math.min(300, zoomVal + delta));
+  document.getElementById('zoom-demo-val').textContent = zoomVal + '%';
+  document.getElementById('zoom-demo-bar').style.width = ((zoomVal / 300) * 100) + '%';
+}
+
+// ── DEMO TABS ─────────────────────────────────────────────
+const tabContents = ['Nueva pestaña — AtsukiBrowser', '▶ YouTube — Video reproduciéndose', '🔍 Google — Búsqueda', '⭐ Favoritos — Tus sitios guardados'];
+let tabCount = 2;
+document.getElementById('demo-tabs-bar').addEventListener('click', e => {
+  const tab = e.target.closest('.demo-tab');
+  if (tab) {
+    document.querySelectorAll('#demo-tabs-bar .demo-tab').forEach(t => t.className = 'demo-tab inactive');
+    tab.className = 'demo-tab active';
+    document.getElementById('demo-tab-content').textContent = tabContents[tab.dataset.idx] || 'Pestaña ' + tab.dataset.idx;
+  }
+});
+document.getElementById('demo-tab-add').addEventListener('click', () => {
+  if (tabCount >= 5) return;
+  const bar = document.getElementById('demo-tabs-bar');
+  const add = document.getElementById('demo-tab-add');
+  const names = ['⭐ Favoritos','🔧 Ajustes','🧩 Extensiones'];
+  const tab = document.createElement('div');
+  tab.className = 'demo-tab inactive';
+  tab.dataset.idx = tabCount;
+  tab.innerHTML = names[tabCount - 2] + ' <span class="demo-x">×</span>';
+  bar.insertBefore(tab, add);
+  tabCount++;
+});
+
+// ── ATAJOS INTERACTIVOS ────────────────────────────────────
+function renderAtajosGrid(containerId, lista) {
+  const grid = document.getElementById(containerId);
+  if (!grid) return;
+  grid.innerHTML = '';
+  lista.forEach(a => {
+    const div = document.createElement('div');
+    div.className = 'atajo-item';
+    div.innerHTML = `
+      <div class="flash"></div>
+      <span class="atajo-desc">${a.desc}</span>
+      <div class="atajo-keys">${a.keys.map(k => `<kbd class="kbd">${k}</kbd>`).join('')}</div>`;
+    grid.appendChild(div);
+  });
+}
+
+renderAtajosGrid('atajos-grid-tabs',  ATAJOS.tabs);
+renderAtajosGrid('atajos-grid-nav',   ATAJOS.nav);
+renderAtajosGrid('atajos-grid-tools', ATAJOS.tools);
+
+// Resaltar atajo al presionar tecla
+document.addEventListener('keydown', e => {
+  const ctrl  = e.ctrlKey;
+  const shift = e.shiftKey;
+  const alt   = e.altKey;
+  const key   = e.key;
+
+  document.querySelectorAll('.atajo-item').forEach(item => {
+    const keys = [...item.querySelectorAll('.kbd')].map(k => k.textContent.toLowerCase());
+    let match = false;
+    if (ctrl  && keys.includes('ctrl'))  match = true;
+    if (!ctrl && keys.includes('ctrl'))  match = false;
+    if (match && shift && keys.includes('shift')) {}
+    else if (match && keys.includes('shift') && !shift) match = false;
+    if (match && key.toLowerCase() === keys[keys.length - 1]?.toLowerCase()) {
+      item.classList.add('activo');
+      setTimeout(() => item.classList.remove('activo'), 800);
+    }
+  });
+});
+
+// ── TEMAS ─────────────────────────────────────────────────
+const themeGrid = document.getElementById('theme-grid-demo');
+TEMAS.forEach((t, i) => {
+  const card = document.createElement('div');
+  card.className = 'theme-card' + (i === 0 ? ' sel' : '');
+  card.innerHTML = `
+    <div class="theme-preview" style="background:${t.bg}">
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;padding:10px;gap:4px;">
+        <div style="height:8px;width:60%;background:${t.surface};border-radius:3px;"></div>
+        <div style="height:4px;width:40%;background:${t.accent};border-radius:2px;margin-top:4px;"></div>
+        <div style="height:4px;width:55%;background:${t.surface2};border-radius:2px;"></div>
+        <div style="height:4px;width:35%;background:${t.surface2};border-radius:2px;"></div>
+      </div>
+    </div>
+    <div class="theme-name" style="background:${t.surface};color:rgba(255,255,255,0.8)">${t.nombre}</div>`;
+  card.addEventListener('click', () => {
+    document.querySelectorAll('.theme-card').forEach(c => c.classList.remove('sel'));
+    card.classList.add('sel');
+    // Solo previsualizar en esta página
+    const r = document.documentElement;
+    r.style.setProperty('--accent',   t.accent);
+    r.style.setProperty('--bg',       t.bg);
+    r.style.setProperty('--surface',  t.surface);
+    r.style.setProperty('--surface2', t.surface2);
+    const hx = t.accent.replace('#','');
+    r.style.setProperty('--border', `rgba(${parseInt(hx.slice(0,2),16)},${parseInt(hx.slice(2,4),16)},${parseInt(hx.slice(4,6),16)},0.2)`);
+  });
+  themeGrid.appendChild(card);
+});
+
+// ── FAQ ACCORDION ─────────────────────────────────────────
+const faqLista = document.getElementById('faq-lista');
+FAQ.forEach(f => {
+  const item = document.createElement('div');
+  item.className = 'faq-item';
+  item.innerHTML = `
+    <div class="faq-q">${f.q} <span class="faq-arrow">▾</span></div>
+    <div class="faq-a">${f.a}</div>`;
+  item.querySelector('.faq-q').addEventListener('click', () => {
+    const wasOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+    if (!wasOpen) item.classList.add('open');
+  });
+  faqLista.appendChild(item);
+});
+
+// ── TEMA DESDE C# ─────────────────────────────────────────
 function aplicarTema(t) {
   const r = document.documentElement;
   const hex = t.Accent ?? t.accent ?? '#7c3aed';
-  r.style.setProperty('--accent', hex);
-  r.style.setProperty('--bg',      t.Bg      ?? t.bg      ?? '#0d0d14');
-  r.style.setProperty('--surface', t.Surface ?? t.surface ?? '#13131f');
-  r.style.setProperty('--surface2',t.Surface2 ?? t.surface2 ?? '#1a1a2e');
+  r.style.setProperty('--accent',   hex);
+  r.style.setProperty('--bg',       t.Bg      ?? t.bg      ?? '#0d0d14');
+  r.style.setProperty('--surface',  t.Surface ?? t.surface ?? '#13131f');
+  r.style.setProperty('--surface2', t.Surface2 ?? t.surface2 ?? '#1a1a2e');
   const hx = hex.replace('#','');
-  const rr = parseInt(hx.slice(0,2),16);
-  const gg = parseInt(hx.slice(2,4),16);
-  const bb = parseInt(hx.slice(4,6),16);
-  r.style.setProperty('--border', `rgba(${rr},${gg},${bb},0.2)`);
+  r.style.setProperty('--border', `rgba(${parseInt(hx.slice(0,2),16)},${parseInt(hx.slice(2,4),16)},${parseInt(hx.slice(4,6),16)},0.2)`);
   r.style.setProperty('--accent2', hex);
 }
 
@@ -725,9 +856,8 @@ window.chrome?.webview?.addEventListener('message', e => {
   if (raw.startsWith('tema:')) aplicarTema(JSON.parse(raw.slice('tema:'.length)));
 });
 
-// ── Back ──
 document.getElementById('btn-back').addEventListener('click', () =>
-  window.chrome.webview.postMessage('navigate:ajustes'));
+  window.chrome?.webview?.postMessage('navigate:ajustes'));
 
 window.chrome?.webview?.postMessage('get:tema');
 </script>

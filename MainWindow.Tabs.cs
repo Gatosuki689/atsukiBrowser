@@ -20,6 +20,123 @@ namespace atsukibrowser
 {
     public partial class MainWindow : Window
     {
+        private const string COOKIE_ACCEPT_SCRIPT = @"
+        (function() {
+            if (window.__atsukiCookieDone) return;
+
+            const TEXTOS_ACEPTAR = [
+                'accept all', 'accept cookies', 'aceptar todo', 'aceptar cookies',
+                'aceptar', 'accept', 'agree', 'i agree', 'ok', 'got it',
+                'entendido', 'estoy de acuerdo', 'allow all', 'allow cookies',
+                'permitir todo', 'permitir cookies', 'i understand', 'continuar'
+            ];
+
+            const SELECTORES_DIRECTOS = [
+                '[id*=""accept""][class*=""cookie""]',
+                '[id*=""cookie""][class*=""accept""]',
+                '[class*=""cookie-accept""]',
+                '[class*=""accept-cookie""]',
+                '[class*=""cookieAccept""]',
+                '[class*=""acceptCookie""]',
+                '[id*=""cookieAccept""]',
+                '[data-testid*=""accept""]',
+                '[aria-label*=""accept"" i]',
+                '.fc-cta-consent',        // Funding Choices (Google)
+                '#onetrust-accept-btn-handler', // OneTrust
+                '.onetrust-accept-btn-handler',
+                '#acceptAllButton',
+                '.accept-all',
+                '#accept-all',
+                'button[mode=""primary""]',
+            ];
+
+            function intentarAceptar() {
+                // 1. Selectores directos
+                for (const sel of SELECTORES_DIRECTOS) {
+                    try {
+                        const btn = document.querySelector(sel);
+                        if (btn && btn.offsetParent !== null) {
+                            btn.click();
+                            window.__atsukiCookieDone = true;
+                            return true;
+                        }
+                    } catch {}
+                }
+
+                // 2. Buscar por texto en botones/links visibles
+                const elementos = document.querySelectorAll('button, a[role=""button""], [role=""button""]');
+                for (const el of elementos) {
+                    const texto = (el.innerText || el.textContent || '').trim().toLowerCase();
+                    if (TEXTOS_ACEPTAR.includes(texto) && el.offsetParent !== null) {
+                        el.click();
+                        window.__atsukiCookieDone = true;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            // Intentar inmediatamente
+            if (intentarAceptar()) return;
+
+            // Si no encontró, observar cambios en el DOM
+            let intentos = 0;
+            const obs = new MutationObserver(() => {
+                if (intentarAceptar() || ++intentos > 20) obs.disconnect();
+            });
+            obs.observe(document.body, { childList: true, subtree: true });
+
+            // Timeout de seguridad: dejar de buscar después de 8 segundos
+            setTimeout(() => obs.disconnect(), 8000);
+        })();
+        ";
+        private const string PIP_BUTTON_SCRIPT = @"
+        (function() {
+            function crearBoton(video) {
+                const parent = video.parentElement;
+                if (!parent) return;
+                if (parent.querySelector('.atsuki-pip-btn')) return; // ya tiene botón
+
+                const btn = document.createElement('div');
+                btn.className = 'atsuki-pip-btn';
+                btn.innerHTML = '📺';
+                btn.title = 'Picture in Picture';
+                btn.style.cssText = `
+                    position: absolute; z-index: 999999;
+                    width: 32px; height: 32px;
+                    background: rgba(0,0,0,0.6);
+                    border-radius: 6px;
+                    display: flex; align-items: center; justify-content: center;
+                    cursor: pointer; font-size: 16px;
+                    opacity: 0; transition: opacity 0.2s;
+                    top: 8px; right: 8px;
+                `;
+                btn.addEventListener('click', e => {
+                    e.stopPropagation(); e.preventDefault();
+                    if (document.pictureInPictureElement) document.exitPictureInPicture();
+                    else video.requestPictureInPicture().catch(()=>{});
+                });
+
+                if (getComputedStyle(parent).position === 'static')
+                    parent.style.position = 'relative';
+                parent.appendChild(btn);
+
+                parent.addEventListener('mouseenter', () => btn.style.opacity = '1');
+                parent.addEventListener('mouseleave', () => btn.style.opacity = '0');
+            }
+
+            function escanear() {
+                document.querySelectorAll('video').forEach(crearBoton);
+            }
+
+            escanear();
+
+            if (!window.__atsukiPipObserver) {
+                window.__atsukiPipObserver = new MutationObserver(escanear);
+                window.__atsukiPipObserver.observe(document.body, { childList: true, subtree: true });
+            }
+        })();
+        ";
         public void AbrirNuevaTabPublic(string url) => AbrirNuevaTab(url);
         private async void PreCalentarTab()
         {
@@ -37,6 +154,9 @@ namespace atsukibrowser
                 wv.CoreWebView2.Settings.IsGeneralAutofillEnabled  = false;
                 wv.CoreWebView2.Profile.PreferredTrackingPreventionLevel =
                     Microsoft.Web.WebView2.Core.CoreWebView2TrackingPreventionLevel.None;
+                wv.CoreWebView2.Settings.UserAgent =
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
 
                 // Cargar extensiones Chrome una sola vez en el perfil
                 if (!_perfiles.Activo.EsInvitado && !_extensionesChromeCargadas)
@@ -92,12 +212,39 @@ namespace atsukibrowser
             if (_env != null)
             {
                 await webView.EnsureCoreWebView2Async(_env);
+                // Ocultar señales de WebView2/automation
+                webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(@"
+                    // Ocultar webdriver
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined,
+                        configurable: true
+                    });
+                    
+                    // Simular plugins de Chrome real
+                    Object.defineProperty(navigator, 'plugins', {
+                        get: () => [
+                            { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer' },
+                            { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai' },
+                            { name: 'Native Client', filename: 'internal-nacl-plugin' }
+                        ]
+                    });
+
+                    // Simular languages
+                    Object.defineProperty(navigator, 'languages', {
+                        get: () => ['es-419', 'es', 'en-US', 'en']
+                    });
+                ");
                 // Optimizaciones por pestaña
                 webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
                 webView.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
                 webView.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
                 webView.CoreWebView2.Profile.PreferredTrackingPreventionLevel =
                     Microsoft.Web.WebView2.Core.CoreWebView2TrackingPreventionLevel.None;
+                webView.CoreWebView2.Settings.UserAgent =
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+                    "(KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36";
+                
+                await webView.CoreWebView2.AddScriptToExecuteOnDocumentCreatedAsync(@"...");
 
                 webView.CoreWebView2.GetDevToolsProtocolEventReceiver("Input.keyEventFired");
                 webView.KeyDown += (s, e) =>
@@ -176,6 +323,52 @@ namespace atsukibrowser
 
                         ActualizarEstrellaFavorito();
                     });
+
+                    // Registrar en historial tras navegación SPA (ej. YouTube Shorts)
+                    string urlEnElMomento = webView.Source?.ToString() ?? "";
+                    if (string.IsNullOrEmpty(urlEnElMomento) ||
+                        urlEnElMomento.StartsWith("chrome-extension://") ||
+                        urlEnElMomento.StartsWith("file:///") ||
+                        urlEnElMomento.StartsWith("devtools://"))
+                        return;
+
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(1200);
+                        Dispatcher.Invoke(() =>
+                        {
+                            string urlAhora = webView.Source?.ToString() ?? "";
+                            // Solo registrar si seguimos en la misma URL (no cambió de nuevo mientras esperábamos)
+                            if (urlAhora != urlEnElMomento) return;
+
+                            string titulo = webView.CoreWebView2?.DocumentTitle ?? urlAhora;
+                            // Evitar títulos genéricos vacíos
+                            if (string.IsNullOrWhiteSpace(titulo) || titulo == "YouTube")
+                                titulo = urlAhora;
+
+                            _historial.Agregar(urlAhora, titulo);
+                        });
+                        // Reinyectar PiP tras navegación SPA
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(1000);
+                            try { await webView.CoreWebView2.ExecuteScriptAsync(PIP_BUTTON_SCRIPT); } catch { }
+                        });
+                    });
+                    // Auto-aceptar cookies si está habilitado y el dominio no está bloqueado
+                    string urlParaCookies = webView.Source?.ToString() ?? "";
+                    if (_cookiesAutoAceptar &&
+                        !string.IsNullOrEmpty(urlParaCookies) &&
+                        urlParaCookies.StartsWith("http") &&
+                        !_cookies.EstaBloqueado(urlParaCookies))
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(1200);
+                            try { await webView.CoreWebView2.ExecuteScriptAsync(COOKIE_ACCEPT_SCRIPT); }
+                            catch { }
+                        });
+                    }
                 };
             }
 
@@ -188,6 +381,7 @@ namespace atsukibrowser
                 // ── Leer TODAS las propiedades ANTES del await ──
                 string linkUrlInicial = "";
                 string imgUrl         = "";
+                string videoUrl = "";
                 string textoSel       = "";
                 bool   editable       = false;
                 string paginaUrl      = webView.Source?.ToString() ?? "";
@@ -197,9 +391,14 @@ namespace atsukibrowser
                 try { linkUrlInicial = target.LinkUri ?? ""; }         catch { }
                 try
                 {
-                    if (!string.IsNullOrEmpty(target.SourceUri) &&
-                        target.Kind == CoreWebView2ContextMenuTargetKind.Image)
-                        imgUrl = target.SourceUri;
+                    if (!string.IsNullOrEmpty(target.SourceUri))
+                    {
+                        if (target.Kind == CoreWebView2ContextMenuTargetKind.Image)
+                            imgUrl = target.SourceUri;
+                        else if (target.Kind == CoreWebView2ContextMenuTargetKind.Video ||
+                                target.Kind == CoreWebView2ContextMenuTargetKind.Audio)
+                            videoUrl = target.SourceUri;
+                    }
                 }
                 catch { }
                 try { textoSel = target.HasSelection ? target.SelectionText ?? "" : ""; } catch { }
@@ -222,6 +421,15 @@ namespace atsukibrowser
                     }
                     catch { }
                 }
+
+                bool tieneVideo = false;
+                try
+                {
+                    string? hayVideo = await webView.CoreWebView2.ExecuteScriptAsync(
+                        "document.querySelector('video') ? 'true' : 'false'");
+                    tieneVideo = hayVideo?.Trim('"') == "true";
+                }
+                catch { }
 
                 Dispatcher.InvokeAsync(() =>
                 {
@@ -297,14 +505,11 @@ namespace atsukibrowser
                             var dlg = new Microsoft.Win32.SaveFileDialog
                             {
                                 FileName = Path.GetFileName(new Uri(imgUrl).LocalPath),
+                                InitialDirectory = _descargas.CarpetaDefault,
                                 Filter = "Imagen|*.jpg;*.jpeg;*.png;*.gif;*.webp;*.svg"
                             };
                             if (dlg.ShowDialog() == true)
-                                _ = Task.Run(async () =>
-                                {
-                                    var bytes = await _httpClient.GetByteArrayAsync(imgUrl);
-                                    File.WriteAllBytes(dlg.FileName, bytes);
-                                });
+                                DescargarArchivoConProgreso(imgUrl, dlg.FileName);
                         }));
                         ctxMenu.Items.Add(CrearItem("📋  Copiar dirección de imagen", "", () => Clipboard.SetText(imgUrl)));
                         ctxMenu.Items.Add(CrearItem("🔗  Abrir imagen en nueva pestaña", "", () => AbrirNuevaTab(imgUrl)));
@@ -326,6 +531,44 @@ namespace atsukibrowser
                         }));
                         ctxMenu.Items.Add(CrearItem("🔍  Buscar imagen en Google", "", () =>
                             AbrirNuevaTab("https://lens.google.com/uploadbyurl?url=" + Uri.EscapeDataString(imgUrl))));
+                        ctxMenu.Items.Add(CrearSep());
+                    }
+
+                    if (tieneVideo)
+                    {
+                        ctxMenu.Items.Add(CrearItem("📺  Picture in Picture", "", () =>
+                        {
+                            _ = webView.CoreWebView2.ExecuteScriptAsync(@"
+                                (function() {
+                                    const videos = Array.from(document.querySelectorAll('video'))
+                                        .filter(v => v.readyState > 0)
+                                        .sort((a,b) => (b.videoWidth*b.videoHeight)-(a.videoWidth*a.videoHeight));
+                                    const v = videos[0] ?? document.querySelector('video');
+                                    if (!v) return;
+                                    if (document.pictureInPictureElement)
+                                        document.exitPictureInPicture().catch(()=>{});
+                                    else
+                                        v.requestPictureInPicture().catch(()=>{});
+                                })()");
+                        }));
+                        ctxMenu.Items.Add(CrearSep());
+                    }
+
+                    if (!string.IsNullOrEmpty(videoUrl))
+                    {
+                        ctxMenu.Items.Add(CrearItem("🎬  Guardar video como...", "", () =>
+                        {
+                            var dlg = new Microsoft.Win32.SaveFileDialog
+                            {
+                                FileName = Path.GetFileName(new Uri(videoUrl).LocalPath),
+                                InitialDirectory = _descargas.CarpetaDefault,
+                                Filter = "Video|*.mp4;*.webm;*.mkv;*.mov|Todos|*.*"
+                            };
+                            if (dlg.ShowDialog() == true)
+                                DescargarArchivoConProgreso(videoUrl, dlg.FileName);
+                        }));
+                        ctxMenu.Items.Add(CrearItem("📋  Copiar dirección de video", "", () => Clipboard.SetText(videoUrl)));
+                        ctxMenu.Items.Add(CrearItem("🔗  Abrir video en nueva pestaña", "", () => AbrirNuevaTab(videoUrl)));
                         ctxMenu.Items.Add(CrearSep());
                     }
 
@@ -373,6 +616,20 @@ namespace atsukibrowser
                         GruposBar.Visibility = _mostrarBarraGrupos ? Visibility.Visible : Visibility.Collapsed;
                         GuardarGrupos();
                     }));
+                    // ── Cookies del sitio ──
+                    string dominio = "";
+                    try { dominio = new Uri(paginaUrl).Host; } catch { }
+                    if (!string.IsNullOrEmpty(dominio))
+                    {
+                        bool bloqueado = _cookies.EstaBloqueado(dominio);
+                        ctxMenu.Items.Add(CrearItem(
+                            bloqueado ? "🍪  Activar auto-aceptar cookies aquí" 
+                                    : "🚫  Nunca aceptar cookies aquí",
+                            "", () =>
+                            {
+                                _cookies.SetRegla(dominio, !bloqueado);
+                            }));
+                    }
                     ctxMenu.Items.Add(CrearItem("📄  Ver código fuente", "", () =>
                         AbrirNuevaTab("view-source:" + paginaUrl)));
                     ctxMenu.Items.Add(CrearItem("📌  Añadir al sidebar", "", () =>
@@ -864,6 +1121,15 @@ namespace atsukibrowser
                         } catch { }
                     });
                 }
+                else if (msg.StartsWith("wallhaven:descargar:"))
+                {
+                    string url = msg.Substring("wallhaven:descargar:".Length);
+                    string nombreArchivo = Path.GetFileName(new Uri(url).LocalPath);
+                    string carpeta = Path.Combine(_descargas.CarpetaDefault, "AtsukiWallpapers");
+                    string destino = Path.Combine(carpeta, nombreArchivo);
+
+                    DescargarArchivoConProgreso(url, destino, webView, "wallhaven:descargado:");
+                }
                 else if (msg == "get:sidebar")
                 {
                     webView.CoreWebView2.PostWebMessageAsString("sidebar:" + _sidebar.ToJson());
@@ -878,6 +1144,70 @@ namespace atsukibrowser
                         _sidebar.Items = items;
                         _sidebar.Guardar();
                         Dispatcher.Invoke(() => RenderizarSidebar());
+                    }
+                }
+                else if (msg == "get:ui:config")
+                {
+                    // Leer configs guardadas
+                    bool animaciones = true;
+                    bool guardarHistorial = true;
+                    bool guardarFavoritos = true;
+
+                    string animPath = Path.Combine(_carpetaPerfil, "ui_animaciones.txt");
+                    string privPath = Path.Combine(_carpetaPerfil, "ui_privacidad.json");
+
+                    if (File.Exists(animPath))
+                        bool.TryParse(File.ReadAllText(animPath).Trim(), out animaciones);
+
+                    if (File.Exists(privPath))
+                    {
+                        try
+                        {
+                            var doc = JsonDocument.Parse(File.ReadAllText(privPath)).RootElement;
+                            if (doc.TryGetProperty("guardar_historial", out var gh))
+                                guardarHistorial = gh.GetBoolean();
+                            if (doc.TryGetProperty("guardar_favoritos", out var gf))
+                                guardarFavoritos = gf.GetBoolean();
+                        }
+                        catch { }
+                    }
+
+                    var config = JsonSerializer.Serialize(new
+                    {
+                        animaciones,
+                        guardar_historial = guardarHistorial,
+                        guardar_favoritos = guardarFavoritos,
+                        auto_cookies      = _cookiesAutoAceptar
+                    });
+                    webView.CoreWebView2?.PostWebMessageAsString("ui:config:" + config);
+                }
+                else if (msg.StartsWith("ui:animaciones:"))
+                {
+                    bool val = msg.EndsWith("true");
+                    File.WriteAllText(Path.Combine(_carpetaPerfil, "ui_animaciones.txt"), val.ToString());
+                }
+                else if (msg.StartsWith("priv:"))
+                {
+                    // priv:guardar_historial:true
+                    var partes = msg.Split(':');
+                    if (partes.Length == 3)
+                    {
+                        string privPath = Path.Combine(_carpetaPerfil, "ui_privacidad.json");
+                        var privData = new Dictionary<string, bool>
+                            { ["guardar_historial"] = true, ["guardar_favoritos"] = true };
+
+                        if (File.Exists(privPath))
+                            try { privData = JsonSerializer.Deserialize<Dictionary<string, bool>>(
+                                File.ReadAllText(privPath)) ?? privData; }
+                            catch { }
+
+                        bool.TryParse(partes[2], out bool val);
+                        privData[partes[1]] = val;
+                        File.WriteAllText(privPath, JsonSerializer.Serialize(privData));
+
+                        // Aplicar en tiempo real
+                        if (partes[1] == "guardar_historial")
+                            _guardarHistorial = val;
                     }
                 }
                 else if (msg == "update:check")
@@ -2106,6 +2436,94 @@ namespace atsukibrowser
                         }
                     });
                 }
+                else if (msg == "novedades:cargar")
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            _httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "AtsukiBrowser");
+                            string json = await _httpClient.GetStringAsync(
+                                $"https://gist.githubusercontent.com/Gatosuki689/f24638ebb9ed77db3a58fc2318103b39/raw/version.json?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
+
+                            var doc = JsonSerializer.Deserialize<JsonElement>(json);
+
+                            string notas = "";
+                            bool esPreview = AppVersion.Contains("-prev") || AppVersion.Contains("-beta") || AppVersion.Contains("-alpha");
+
+                            if (esPreview && doc.TryGetProperty("preview", out var prev))
+                            {
+                                string prevVersion = prev.TryGetProperty("version", out var pv) ? pv.GetString() ?? "" : "";
+                                if (prevVersion == AppVersion)
+                                    notas = prev.TryGetProperty("notas", out var pn) ? pn.GetString() ?? "" : "";
+                            }
+
+                            if (string.IsNullOrEmpty(notas))
+                            {
+                                string ultimaVersion = doc.TryGetProperty("version", out var v) ? v.GetString() ?? "" : "";
+                                if (ultimaVersion == AppVersion)
+                                    notas = doc.TryGetProperty("notas", out var n) ? n.GetString() ?? "" : "";
+                            }
+
+                            var payload = JsonSerializer.Serialize(new
+                            {
+                                version = AppVersion,
+                                notas,
+                                esPreview
+                            });
+
+                            Dispatcher.Invoke(() =>
+                                webView.CoreWebView2.PostWebMessageAsString("novedades:datos:" + payload));
+                        }
+                        catch
+                        {
+                            Dispatcher.Invoke(() =>
+                                webView.CoreWebView2.PostWebMessageAsString("novedades:datos:" +
+                                    JsonSerializer.Serialize(new { version = "", notas = "", esPreview = false })));
+                        }
+                    });
+                    webView.CoreWebView2.PostWebMessageAsString("tema:" + _temas.ToJson());
+                }
+                else if (msg == "get:cookies")
+                {
+                    string json = _cookies.ToJson();
+                    webView.CoreWebView2?.PostWebMessageAsString("cookies:reglas:" + json);
+                }
+                else if (msg.StartsWith("cookies:bloquear:"))
+                {
+                    string dom = msg.Substring("cookies:bloquear:".Length);
+                    _cookies.SetRegla(dom, true);
+                }
+                else if (msg.StartsWith("cookies:permitir:"))
+                {
+                    string dom = msg.Substring("cookies:permitir:".Length);
+                    _cookies.SetRegla(dom, false);
+                }
+                else if (msg.StartsWith("cookies:eliminar:"))
+                {
+                    string dom = msg.Substring("cookies:eliminar:".Length);
+                    _cookies.EliminarRegla(dom);
+                }
+                else if (msg.StartsWith("cookies:auto:"))
+                {
+                    bool activo = msg.EndsWith("true");
+                    _cookiesAutoAceptar = activo;
+                    // Guardar en disco
+                    try { File.WriteAllText(
+                        Path.Combine(_carpetaPerfil, "cookies_auto.txt"), activo.ToString()); }
+                    catch { }
+                }
+                else if (msg == "get:novedades")
+                {
+                    string notasPath = Path.Combine(_carpetaPerfil, "notas_version.txt");
+                    string notas = File.Exists(notasPath) ? File.ReadAllText(notasPath) : "";
+                    var payload = JsonSerializer.Serialize(new {
+                        version   = AppVersion,
+                        notas     = notas,
+                        esPreview = AppVersion.Contains("-")
+                    });
+                    Dispatcher.Invoke(() => webView.CoreWebView2.PostWebMessageAsString("novedades:" + payload));
+                }
             };
 
             // ── Descargas ────────────────────────────────────
@@ -2187,7 +2605,8 @@ namespace atsukibrowser
                     if (idx < _tabButtons.Count && _tabButtons[idx].Tag is TextBlock label)  // ← guarda añadida
                         label.Text = titulo;
 
-                    _historial.Agregar(url, titulo);
+                    if (_guardarHistorial)
+                        _historial.Agregar(url, titulo);
                     ActualizarEstrellaFavorito();
                 });
 
@@ -2334,6 +2753,8 @@ namespace atsukibrowser
                         catch { }
                     }
                 }
+                try { await webView.CoreWebView2.ExecuteScriptAsync(PIP_BUTTON_SCRIPT); }
+                catch { }
             };
 
             webView.NavigationCompleted += WebView_NavigationCompleted;

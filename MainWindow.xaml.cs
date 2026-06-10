@@ -84,6 +84,7 @@ namespace atsukibrowser
         private bool _sbWidgetReloj = true;
         private bool _sbWidgetCapturas  = true;
         private bool _sbWidgetBusqueda  = true;
+        private bool _guardarHistorial = true;
         private GlobalSystemMediaTransportControlsSessionManager? _smtc;
         private List<WebView2> _tabs = new();
         private List<Button> _tabButtons = new();
@@ -98,6 +99,8 @@ namespace atsukibrowser
         private DescargasManager _descargas = null!;
         private ExtensionesManager _extensiones = null!;
         private AtajosManager _atajos = null!;
+        private CookiesManager _cookies = null!;
+        private bool _cookiesAutoAceptar = true;
         private string _urlNuevaTab;
         private readonly string _urlHistorial;
         private readonly string _urlFavoritos;
@@ -373,61 +376,8 @@ namespace atsukibrowser
             UrlBar.ContextMenu = ctxMenu;
         }
 
-        private async void AbrirNotasVersion(string version, string notas)
+        private async void AbrirNotasVersion(string notas = "")
         {
-            string html = $$"""
-            <!DOCTYPE html>
-            <html lang="es">
-            <head>
-            <meta charset="UTF-8">
-            <style>
-                * { margin:0; padding:0; box-sizing:border-box; }
-                body {
-                    font-family: 'Segoe UI', sans-serif;
-                    background: #0d0d14;
-                    color: rgba(255,255,255,0.85);
-                    display: flex;
-                    justify-content: center;
-                    padding: 60px 20px;
-                    min-height: 100vh;
-                }
-                .card { width: 100%; max-width: 620px; }
-                .badge {
-                    display: inline-block;
-                    background: rgba(124,58,237,0.15);
-                    border: 1px solid rgba(124,58,237,0.3);
-                    color: #9d5aff;
-                    font-size: 11px;
-                    font-weight: 600;
-                    letter-spacing: 0.08em;
-                    text-transform: uppercase;
-                    padding: 4px 12px;
-                    border-radius: 20px;
-                    margin-bottom: 16px;
-                }
-                h1 { font-size: 32px; font-weight: 700; letter-spacing: -1px; margin-bottom: 6px; }
-                .sub { font-size: 13px; color: rgba(255,255,255,0.35); margin-bottom: 32px; }
-                .divider { height: 1px; background: rgba(124,58,237,0.2); margin-bottom: 32px; }
-                .notas-titulo { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #7c3aed; margin-bottom: 16px; }
-                .notas { background: #13131f; border: 1px solid rgba(124,58,237,0.2); border-radius: 12px; padding: 20px 24px; font-size: 13px; line-height: 1.8; color: rgba(255,255,255,0.7); white-space: pre-line; }
-                .footer { margin-top: 32px; font-size: 12px; color: rgba(255,255,255,0.25); text-align: center; }
-            </style>
-            </head>
-            <body>
-                <div class="card">
-                    <div class="badge">Novedades</div>
-                    <h1>AtsukiBrowser {{version}}</h1>
-                    <div class="sub">Gracias por actualizar. Esto es lo nuevo en esta versión.</div>
-                    <div class="divider"></div>
-                    <div class="notas-titulo">Notas de versión</div>
-                    <div class="notas">{{(string.IsNullOrWhiteSpace(notas) ? "Sin notas para esta versión." : notas)}}</div>
-                    <div class="footer">AtsukiBrowser · v{{version}}</div>
-                </div>
-            </body>
-            </html>
-            """;
-
-            // Esperar a que haya al menos una tab lista
             if (_tabs.Count == 0 || _activeTab < 0)
             {
                 await Task.Delay(500);
@@ -436,33 +386,43 @@ namespace atsukibrowser
 
             AbrirNuevaTab();
 
-            // Verificar que se creó correctamente
             if (_activeTab < 0 || _activeTab >= _tabs.Count) return;
 
             var webView = _tabs[_activeTab];
             int idx = _activeTab;
 
-            // Esperar a que CoreWebView2 esté listo
+            string novedadesPath = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory, "Resources", "AtsukiNovedades.html");
+
             await webView.EnsureCoreWebView2Async(_env);
-
-            // Esperar un tick para que NuevaTab.html termine de iniciar su navegación
-            await Task.Delay(300);
-
-            webView.NavigateToString(html);
+            webView.Source = new Uri("file:///" + novedadesPath.Replace("\\", "/"));
 
             if (idx >= 0 && idx < _tabButtons.Count && _tabButtons[idx].Tag is TextBlock label)
-                label.Text = $"Novedades v{version}";
+                label.Text = $"Novedades v{AppVersion}";
 
-            // Mostrar URL amigable en la barra
             if (idx == _activeTab)
             {
                 _ignorarGotFocus = true;
                 _ignorarTextChanged = true;
-                UrlBar.Text = $"atsuki://novedades/v{version}";
+                UrlBar.Text = $"atsuki://novedades/v{AppVersion}";
                 _ignorarTextChanged = false;
-                ActualizarUrlDisplay($"atsuki://novedades/v{version}");
+                ActualizarUrlDisplay($"atsuki://novedades/v{AppVersion}");
                 _ignorarGotFocus = false;
             }
+
+            EventHandler<CoreWebView2NavigationCompletedEventArgs> handler = null;
+            handler = async (s, e) =>
+            {
+                webView.NavigationCompleted -= handler;
+                await Task.Delay(300);
+                var payload = JsonSerializer.Serialize(new {
+                    version   = AppVersion,
+                    notas     = notas,
+                    esPreview = AppVersion.Contains("-")
+                });
+                webView.CoreWebView2.PostWebMessageAsString("novedades:" + payload);
+            };
+            webView.NavigationCompleted += handler;
         }
 
         private bool IsDescendantOfPopup(DependencyObject element, System.Windows.Controls.Primitives.Popup popup)
@@ -696,6 +656,56 @@ namespace atsukibrowser
             if (_activeTab >= 0) _tabs[_activeTab].Source = new Uri(_urlAjustes);
         }
 
+        private void MenuAyuda_Click(object sender, RoutedEventArgs e)
+        {
+            PopupMenu.IsOpen = false;
+            string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "Ayuda.html");
+            AbrirNuevaTab("file:///" + path.Replace("\\", "/"));
+        }
+
+        private void MenuNovedades_Click(object sender, RoutedEventArgs e)
+        {
+            PopupMenu.IsOpen = false;
+            string notasPath = Path.Combine(_carpetaPerfil, "notas_version.txt");
+
+            if (File.Exists(notasPath))
+            {
+                string notas = File.ReadAllText(notasPath);
+                AbrirNotasVersion(notas);
+            }
+            else
+            {
+                // Descargar notas si no existen
+                AbrirNotasVersion(); // abre primero vacío
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        _httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "AtsukiBrowser");
+                        string json = await _httpClient.GetStringAsync(
+                            $"https://gist.githubusercontent.com/Gatosuki689/f24638ebb9ed77db3a58fc2318103b39/raw/version.json?t={DateTimeOffset.UtcNow.ToUnixTimeSeconds()}");
+                        var doc  = JsonSerializer.Deserialize<JsonElement>(json);
+                        string notas = doc.TryGetProperty("notas", out var n) ? n.GetString() ?? "" : "";
+                        if (AppVersion.Contains("-") && doc.TryGetProperty("preview", out var prev))
+                            if (prev.TryGetProperty("notas", out var pn))
+                                notas = pn.GetString() ?? notas;
+                        File.WriteAllText(notasPath, notas);
+                        // Mandar las notas a la página ya abierta
+                        var payload = JsonSerializer.Serialize(new {
+                            version   = AppVersion,
+                            notas     = notas,
+                            esPreview = AppVersion.Contains("-")
+                        });
+                        Dispatcher.Invoke(() => {
+                            var wv = _tabs[_activeTab];
+                            wv.CoreWebView2?.PostWebMessageAsString("novedades:" + payload);
+                        });
+                    }
+                    catch { }
+                });
+            }
+        }
+
         private void AbrirONavegar(string url)
         {
             string destino = url switch
@@ -708,6 +718,7 @@ namespace atsukibrowser
                 "extensiones" => _urlExtensiones,
                 "perfiles"   => _urlPerfiles,
                 "capturas"    => _urlCapturas,
+                "ayuda"    => _urlAyuda,
                 _           => url
             };
 
@@ -1053,6 +1064,60 @@ namespace atsukibrowser
                     Margin = new Thickness(0, 2, 0, 2)
                 });
             }
+        }
+
+        private void DescargarArchivoConProgreso(string url, string destino, WebView2? webViewNotificar = null, string? notifyPrefix = null)
+        {
+            string nombre = Path.GetFileName(destino);
+            var entrada = _descargas.IniciarDescarga(url, nombre);
+            entrada.Ruta = destino;
+            Dispatcher.Invoke(() => { ActualizarBadgeDescargas(); NotificarDescargasActivas(); });
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    _httpClient.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", "AtsukiBrowser");
+
+                    using var resp = await _httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
+                    entrada.Total = resp.Content.Headers.ContentLength ?? 0;
+
+                    using var stream = await resp.Content.ReadAsStreamAsync();
+                    Directory.CreateDirectory(Path.GetDirectoryName(destino)!);
+                    using var fs = File.Create(destino);
+
+                    var buffer = new byte[81920];
+                    int read;
+                    long total = 0;
+                    while ((read = await stream.ReadAsync(buffer)) > 0)
+                    {
+                        await fs.WriteAsync(buffer.AsMemory(0, read));
+                        total += read;
+                        entrada.Recibido = total;
+                        Dispatcher.Invoke(NotificarDescargasActivas);
+                    }
+
+                    _descargas.CompletarDescarga(entrada.Id);
+                    Dispatcher.Invoke(() =>
+                    {
+                        NotificarDescargasActivas();
+                        ActualizarBadgeDescargas();
+                        if (webViewNotificar != null && notifyPrefix != null)
+                            webViewNotificar.CoreWebView2.PostWebMessageAsString(notifyPrefix + entrada.Ruta);
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _descargas.CancelarDescarga(entrada.Id);
+                    Dispatcher.Invoke(() =>
+                    {
+                        NotificarDescargasActivas();
+                        ActualizarBadgeDescargas();
+                        if (webViewNotificar != null && notifyPrefix != null)
+                            webViewNotificar.CoreWebView2.PostWebMessageAsString("wallhaven:descarga-error:" + ex.Message);
+                    });
+                }
+            });
         }
 
         private void UrlDisplay_MouseDown(object sender, MouseButtonEventArgs e)

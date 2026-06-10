@@ -310,6 +310,7 @@ body {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
 }
 
 /* ── TOAST ── */
@@ -350,6 +351,71 @@ body {
 }
 .reciente-item:hover .rec-del { opacity: 0.5; }
 .rec-del:hover { opacity: 1 !important; color: var(--danger); }
+
+/* Canvas de imágenes flotantes — encima del editor */
+#float-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  overflow: hidden;
+}
+.float-img-wrapper {
+  position: absolute;
+  pointer-events: all;
+  cursor: move;
+  user-select: none;
+}
+.float-img-wrapper img {
+  width: 100%; height: 100%;
+  object-fit: fill;
+  pointer-events: none;
+  display: block;
+}
+.float-img-wrapper.selected {
+  outline: 2px solid var(--accent);
+}
+
+.ql-editor img {
+  max-width: 100%;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: box-shadow 0.15s;
+}
+.ql-editor img:hover {
+  box-shadow: 0 0 0 2px rgba(124,58,237,0.4);
+}
+
+#ctx-menu {
+  position: fixed;
+  background: #ffffff;
+  border: 1px solid #d0d0d0;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  z-index: 9999;
+  min-width: 200px;
+  padding: 4px 0;
+  font-family: 'Segoe UI', sans-serif;
+  font-size: 13px;
+  color: #1a1a1a;
+  display: none;
+}
+.ctx-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 16px; cursor: pointer;
+  transition: background 0.1s;
+  white-space: nowrap;
+}
+.ctx-item:hover { background: #e8e8f0; }
+.ctx-item.disabled { color: #aaa; pointer-events: none; }
+.ctx-item .ctx-icon { width: 16px; text-align: center; font-size: 14px; }
+.ctx-sep {
+  height: 1px; background: #e0e0e0;
+  margin: 4px 0;
+}
+.ctx-item .ctx-shortcut {
+  margin-left: auto; color: #888; font-size: 11px;
+}
 </style>
 </head>
 <body>
@@ -390,12 +456,14 @@ body {
     <div id="quill-wrap">
       <!-- Quill se monta aquí -->
       <div id="quill-editor"></div>
+      <div id="float-canvas"></div>
     </div>
   </div>
 
 </div>
 
 <div id="toast"></div>
+<div id="ctx-menu"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quill/1.3.7/quill.min.js"></script>
 <script>
@@ -452,6 +520,327 @@ quill.on('text-change', () => {
 
   actualizarStatus('Sin guardar');
 });
+
+// ── Sistema de imágenes flotantes estilo Word ──
+(function() {
+  const canvas = document.getElementById('float-canvas');
+  let selected = null; // { wrapper, img, overlay }
+  let mode = null; // 'move' | 'resize' | 'rotate'
+  let startX, startY, startLeft, startTop, startW, startH, startAngle, currentAngle;
+  let activeHandle;
+
+  function getAngle(wrapper) {
+    const m = (wrapper.style.transform||'').match(/rotate\(([-\d.]+)deg\)/);
+    return m ? parseFloat(m[1]) : 0;
+  }
+  function setAngle(wrapper, deg) {
+    wrapper.style.transform = `rotate(${deg}deg)`;
+  }
+
+  // Crear wrapper flotante desde una img de Quill
+  function flotarImagen(img) {
+    const editorRect = document.getElementById('quill-editor').getBoundingClientRect();
+    const canvasRect = canvas.getBoundingClientRect();
+    const imgRect    = img.getBoundingClientRect();
+
+    // Crear wrapper en el canvas flotante
+    const wrapper = document.createElement('div');
+    wrapper.className = 'float-img-wrapper';
+    wrapper.style.left   = (imgRect.left - canvasRect.left) + 'px';
+    wrapper.style.top    = (imgRect.top  - canvasRect.top)  + 'px';
+    wrapper.style.width  = img.naturalWidth  > 0 ? img.offsetWidth  + 'px' : imgRect.width  + 'px';
+    wrapper.style.height = img.naturalHeight > 0 ? img.offsetHeight + 'px' : imgRect.height + 'px';
+
+    const newImg = document.createElement('img');
+    newImg.src = img.src;
+    wrapper.appendChild(newImg);
+    canvas.appendChild(wrapper);
+
+    // Ocultar la imagen original en Quill
+    img.style.visibility = 'hidden';
+    img.dataset.floatId  = Date.now().toString();
+    wrapper.dataset.srcImgId = img.dataset.floatId;
+
+    seleccionarWrapper(wrapper, img);
+    return wrapper;
+  }
+
+  function seleccionarWrapper(wrapper, srcImg) {
+    deseleccionar();
+    selected = { wrapper, srcImg };
+    currentAngle = getAngle(wrapper);
+    wrapper.classList.add('selected');
+    crearHandles(wrapper);
+  }
+
+  function deseleccionar() {
+    if (!selected) return;
+    selected.wrapper.classList.remove('selected');
+    selected.wrapper.querySelectorAll('[data-hdl]').forEach(h => h.remove());
+    selected.wrapper.querySelector('.img-toolbar')?.remove();
+    selected = null;
+    mode = null;
+  }
+
+  function crearHandles(wrapper) {
+    // Toolbar
+    const toolbar = document.createElement('div');
+    toolbar.className = 'img-toolbar';
+    toolbar.style.cssText = `
+      position:absolute; top:-38px; left:50%; transform:translateX(-50%);
+      background:rgba(13,13,20,0.95); border:1px solid var(--border);
+      border-radius:6px; padding:3px 8px; display:flex; gap:6px;
+      pointer-events:all; box-shadow:0 4px 12px rgba(0,0,0,0.3);
+      white-space:nowrap; align-items:center; z-index:10;
+    `;
+
+    // Ancho
+    const wInput = document.createElement('input');
+    wInput.type='number'; wInput.value=Math.round(parseFloat(wrapper.style.width));
+    wInput.title='Ancho px';
+    wInput.style.cssText='width:52px;background:transparent;border:none;color:var(--text);font-size:11px;font-family:Segoe UI,sans-serif;text-align:center;outline:none;';
+    wInput.addEventListener('change', () => {
+      const w=parseInt(wInput.value);
+      if(w>0){
+        const ratio=parseFloat(wrapper.style.height)/parseFloat(wrapper.style.width);
+        wrapper.style.width=w+'px';
+        wrapper.style.height=(w*ratio)+'px';
+      }
+    });
+    toolbar.appendChild(wInput);
+
+    const sep=document.createElement('span');
+    sep.textContent='×'; sep.style.cssText='color:var(--muted);font-size:11px;';
+    toolbar.appendChild(sep);
+
+    // Alto
+    const hInput=document.createElement('input');
+    hInput.type='number'; hInput.value=Math.round(parseFloat(wrapper.style.height));
+    hInput.title='Alto px';
+    hInput.style.cssText='width:52px;background:transparent;border:none;color:var(--text);font-size:11px;font-family:Segoe UI,sans-serif;text-align:center;outline:none;';
+    hInput.addEventListener('change', () => {
+      const h=parseInt(hInput.value);
+      if(h>0) wrapper.style.height=h+'px';
+    });
+    toolbar.appendChild(hInput);
+
+    const sep2=document.createElement('span');
+    sep2.textContent='|'; sep2.style.cssText='color:var(--border);';
+    toolbar.appendChild(sep2);
+
+    // Rotación
+    const rInput=document.createElement('input');
+    rInput.type='number'; rInput.value=Math.round(currentAngle);
+    rInput.title='Rotación °';
+    rInput.style.cssText='width:46px;background:transparent;border:none;color:var(--accent2);font-size:11px;font-family:Segoe UI,sans-serif;text-align:center;outline:none;';
+    rInput.addEventListener('change', () => {
+      currentAngle=parseFloat(rInput.value)||0;
+      setAngle(wrapper,currentAngle);
+    });
+    const deg=document.createElement('span');
+    deg.textContent='°'; deg.style.cssText='color:var(--muted);font-size:11px;';
+    toolbar.appendChild(rInput);
+    toolbar.appendChild(deg);
+
+    const sep3=document.createElement('span');
+    sep3.textContent='|'; sep3.style.cssText='color:var(--border);';
+    toolbar.appendChild(sep3);
+
+    // Botón eliminar
+    const delBtn=document.createElement('button');
+    delBtn.textContent='🗑'; delBtn.title='Eliminar imagen';
+    delBtn.style.cssText='background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted);padding:0 2px;';
+    delBtn.addEventListener('click', () => {
+      if(selected?.srcImg) selected.srcImg.remove();
+      wrapper.remove();
+      selected=null;
+    });
+    toolbar.appendChild(delBtn);
+
+    wrapper.appendChild(toolbar);
+    wrapper._wInput = wInput;
+    wrapper._hInput = hInput;
+    wrapper._rInput = rInput;
+
+    // Handle rotar (esquina sup der fuera del wrapper)
+    const rotH=document.createElement('div');
+    rotH.dataset.hdl='rot';
+    rotH.style.cssText=`
+      position:absolute; top:-28px; right:-8px;
+      width:18px; height:18px; border-radius:50%;
+      background:white; border:2px solid var(--accent);
+      cursor:crosshair; pointer-events:all; z-index:10;
+      display:flex; align-items:center; justify-content:center;
+      font-size:11px;
+    `;
+    rotH.innerHTML='↻';
+    rotH.addEventListener('mousedown', e => {
+      e.preventDefault(); e.stopPropagation();
+      mode='rotate';
+      const r=wrapper.getBoundingClientRect();
+      const cx=r.left+r.width/2, cy=r.top+r.height/2;
+      startAngle=Math.atan2(e.clientY-cy, e.clientX-cx)*180/Math.PI - currentAngle;
+    });
+    wrapper.appendChild(rotH);
+
+    // 8 handles de resize
+    [
+      {id:'tl', s:'top:-5px;left:-5px;',                        c:'nw-resize'},
+      {id:'tc', s:'top:-5px;left:calc(50% - 5px);',             c:'n-resize' },
+      {id:'tr', s:'top:-5px;right:-5px;',                       c:'ne-resize'},
+      {id:'ml', s:'top:calc(50% - 5px);left:-5px;',             c:'w-resize' },
+      {id:'mr', s:'top:calc(50% - 5px);right:-5px;',            c:'e-resize' },
+      {id:'bl', s:'bottom:-5px;left:-5px;',                     c:'sw-resize'},
+      {id:'bc', s:'bottom:-5px;left:calc(50% - 5px);',          c:'s-resize' },
+      {id:'br', s:'bottom:-5px;right:-5px;',                    c:'se-resize'},
+    ].forEach(({id,s,c}) => {
+      const h=document.createElement('div');
+      h.dataset.hdl=id;
+      h.style.cssText=`position:absolute;width:10px;height:10px;background:var(--accent);border:2px solid white;border-radius:2px;cursor:${c};pointer-events:all;box-sizing:border-box;${s}`;
+      h.addEventListener('mousedown', e => {
+        e.preventDefault(); e.stopPropagation();
+        mode='resize'; activeHandle=id;
+        startX=e.clientX; startY=e.clientY;
+        startW=parseFloat(wrapper.style.width);
+        startH=parseFloat(wrapper.style.height);
+        startLeft=parseFloat(wrapper.style.left);
+        startTop=parseFloat(wrapper.style.top);
+      });
+      wrapper.appendChild(h);
+    });
+  }
+
+  // Mover al hacer mousedown en el wrapper
+  canvas.addEventListener('mousedown', e => {
+    const wrapper=e.target.closest('.float-img-wrapper');
+    if(!wrapper) { deseleccionar(); return; }
+    if(e.target.dataset.hdl || e.target.closest('.img-toolbar')) return;
+    // Seleccionar si no estaba
+    if(!selected || selected.wrapper!==wrapper) {
+      const srcImg=document.querySelector(`[data-float-id="${wrapper.dataset.srcImgId}"]`);
+      seleccionarWrapper(wrapper, srcImg);
+    }
+    // Iniciar movimiento
+    mode='move';
+    startX=e.clientX; startY=e.clientY;
+    startLeft=parseFloat(wrapper.style.left);
+    startTop=parseFloat(wrapper.style.top);
+    e.preventDefault();
+  });
+
+  // MouseMove
+  document.addEventListener('mousemove', e => {
+    if(!mode || !selected) return;
+    const w=selected.wrapper;
+
+    if(mode==='move') {
+      w.style.left=(startLeft+e.clientX-startX)+'px';
+      w.style.top =(startTop +e.clientY-startY)+'px';
+    }
+    else if(mode==='resize') {
+      const dx=e.clientX-startX, dy=e.clientY-startY;
+      let nw=startW, nh=startH, nl=startLeft, nt=startTop;
+      const ratio=startH/startW;
+
+      if(activeHandle.includes('r')) nw=Math.max(20,startW+dx);
+      if(activeHandle.includes('l')){ nw=Math.max(20,startW-dx); nl=startLeft+startW-nw; }
+      if(activeHandle.includes('b')) nh=Math.max(20,startH+dy);
+      if(activeHandle.includes('t')){ nh=Math.max(20,startH-dy); nt=startTop+startH-nh; }
+
+      // Shift = proporcional
+      if(e.shiftKey && (activeHandle==='br'||activeHandle==='tr'||activeHandle==='bl'||activeHandle==='tl')) {
+        nh=nw*ratio;
+      }
+
+      w.style.width=nw+'px'; w.style.height=nh+'px';
+      w.style.left=nl+'px';  w.style.top=nt+'px';
+      if(w._wInput) w._wInput.value=Math.round(nw);
+      if(w._hInput) w._hInput.value=Math.round(nh);
+    }
+    else if(mode==='rotate') {
+      const r=w.getBoundingClientRect();
+      const angle=Math.atan2(e.clientY-(r.top+r.height/2), e.clientX-(r.left+r.width/2))*180/Math.PI;
+      currentAngle=angle-startAngle;
+      setAngle(w,currentAngle);
+      if(w._rInput) w._rInput.value=Math.round(currentAngle);
+    }
+  });
+
+  // MouseUp
+  document.addEventListener('mouseup', () => {
+    if (mode) {
+      pushHistorial();
+      mode = null; activeHandle = null;
+    }
+  });
+
+  // Click en imagen de Quill → flotarla
+  document.getElementById('quill-editor').addEventListener('click', e => {
+    if(e.target.tagName==='IMG' && e.target.style.visibility!=='hidden') {
+      flotarImagen(e.target);
+    }
+  });
+
+  // Click fuera → deseleccionar
+  document.addEventListener('mousedown', e => {
+    if(!e.target.closest('#float-canvas') && !e.target.closest('.ql-editor'))
+      deseleccionar();
+  });
+
+  // Stack de historial para imágenes flotantes
+  const historialFloat = [];
+  const redoFloat = [];
+
+  function pushHistorial() {
+    const estado = Array.from(canvas.querySelectorAll('.float-img-wrapper')).map(w => ({
+      src:    w.querySelector('img').src,
+      left:   w.style.left,
+      top:    w.style.top,
+      width:  w.style.width,
+      height: w.style.height,
+      transform: w.style.transform,
+      srcImgId: w.dataset.srcImgId
+    }));
+    historialFloat.push(JSON.stringify(estado));
+    redoFloat.length = 0; // limpiar redo al hacer acción nueva
+  }
+
+  function restaurarEstado(estadoJson) {
+    const estado = JSON.parse(estadoJson);
+    // Quitar todos los wrappers actuales
+    canvas.querySelectorAll('.float-img-wrapper').forEach(w => w.remove());
+    // Restaurar
+    for (const s of estado) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'float-img-wrapper';
+      wrapper.style.left=s.left; wrapper.style.top=s.top;
+      wrapper.style.width=s.width; wrapper.style.height=s.height;
+      wrapper.style.transform=s.transform;
+      wrapper.dataset.srcImgId=s.srcImgId;
+      const img=document.createElement('img'); img.src=s.src;
+      wrapper.appendChild(img);
+      canvas.appendChild(wrapper);
+    }
+  }
+
+  document.addEventListener('keydown', e => {
+    if (!e.ctrlKey) return;
+    if (e.key === 'z' && !e.shiftKey) {
+      if (historialFloat.length > 1) {
+        redoFloat.push(historialFloat.pop());
+        restaurarEstado(historialFloat[historialFloat.length-1]);
+      }
+      // Dejar que Quill maneje el Ctrl+Z del texto también
+    }
+    if ((e.key === 'y') || (e.key === 'z' && e.shiftKey)) {
+      if (redoFloat.length > 0) {
+        const estado = redoFloat.pop();
+        historialFloat.push(estado);
+        restaurarEstado(estado);
+      }
+    }
+  });
+})();
 
 // ═══════════════════════════════════════════════
 //  DOCUMENTOS
@@ -754,6 +1143,117 @@ renderTabs();
 renderRecientes();
 window.chrome.webview.postMessage('get:tema');
 window.chrome.webview.postMessage('docs:recientes:cargar');
+
+// ── Menú contextual ──
+(function() {
+  const menu = document.getElementById('ctx-menu');
+
+  function cerrar() { menu.style.display = 'none'; }
+
+  function mostrar(x, y, items) {
+    menu.innerHTML = '';
+    for (const item of items) {
+      if (item === 'sep') {
+        const sep = document.createElement('div');
+        sep.className = 'ctx-sep';
+        menu.appendChild(sep);
+        continue;
+      }
+      const el = document.createElement('div');
+      el.className = 'ctx-item' + (item.disabled ? ' disabled' : '');
+      el.innerHTML = `
+        <span class="ctx-icon">${item.icon ?? ''}</span>
+        <span>${item.label}</span>
+        ${item.shortcut ? `<span class="ctx-shortcut">${item.shortcut}</span>` : ''}
+      `;
+      if (!item.disabled) el.addEventListener('click', () => { cerrar(); item.action(); });
+      menu.appendChild(el);
+    }
+    menu.style.display = 'block';
+    const mw = menu.offsetWidth, mh = menu.offsetHeight;
+    menu.style.left = (x + mw > window.innerWidth  ? x - mw : x) + 'px';
+    menu.style.top  = (y + mh > window.innerHeight ? y - mh : y) + 'px';
+  }
+
+  // ── Menú para el editor de texto ──
+  document.getElementById('quill-editor').addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const sel = window.getSelection()?.toString() ?? '';
+    mostrar(e.clientX, e.clientY, [
+      { icon:'✂️', label:'Cortar',            shortcut:'Ctrl+X', disabled:!sel, action:()=>document.execCommand('cut') },
+      { icon:'📋', label:'Copiar',            shortcut:'Ctrl+C', disabled:!sel, action:()=>document.execCommand('copy') },
+      { icon:'📌', label:'Pegar',             shortcut:'Ctrl+V', action:()=>{
+          navigator.clipboard.readText().then(txt=>{
+            const r=quill.getSelection(true);
+            quill.insertText(r.index, txt);
+          }).catch(()=>document.execCommand('paste'));
+      }},
+      { icon:'📝', label:'Pegar sin formato', shortcut:'Ctrl+Shift+V', action:()=>{
+          navigator.clipboard.readText().then(txt=>{
+            const r=quill.getSelection(true);
+            quill.insertText(r.index, txt, 'user');
+          });
+      }},
+      'sep',
+      { icon:'↩', label:'Deshacer', shortcut:'Ctrl+Z', action:()=>quill.history.undo() },
+      { icon:'↪', label:'Rehacer',  shortcut:'Ctrl+Y', action:()=>quill.history.redo() },
+      'sep',
+      { icon:'A',  label:'Seleccionar todo', shortcut:'Ctrl+A', action:()=>quill.setSelection(0, quill.getLength()) },
+      'sep',
+      { icon:'🔍', label:'Buscar en la web', disabled:!sel, action:()=>{
+          if(sel) window.chrome?.webview?.postMessage('navegar:https://www.google.com/search?q='+encodeURIComponent(sel));
+      }},
+    ]);
+  });
+
+  // ── Menú para imágenes flotantes ──
+  document.getElementById('float-canvas').addEventListener('contextmenu', e => {
+    e.preventDefault();
+    const wrapper = e.target.closest('.float-img-wrapper');
+    if (!wrapper) return;
+
+    // Seleccionar la imagen si no lo estaba
+    const srcImg = document.querySelector(`[data-float-id="${wrapper.dataset.srcImgId}"]`);
+    // Disparar click para seleccionarla visualmente
+    wrapper.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, clientX: e.clientX, clientY: e.clientY }));
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+    mostrar(e.clientX, e.clientY, [
+      { icon:'📐', label:'Restablecer tamaño', action:()=>{
+          const img=wrapper.querySelector('img');
+          const tmp=new Image(); tmp.src=img.src;
+          tmp.onload=()=>{
+            wrapper.style.width=tmp.naturalWidth+'px';
+            wrapper.style.height=tmp.naturalHeight+'px';
+          };
+      }},
+      { icon:'↺',  label:'Sin rotación', action:()=>{
+          wrapper.style.transform='rotate(0deg)';
+          if(wrapper._rInput) wrapper._rInput.value=0;
+      }},
+      'sep',
+      { icon:'⬛', label:'Sin alineación', action:()=>{ if(srcImg){ srcImg.style.float=''; srcImg.style.display=''; srcImg.style.margin=''; }}},
+      { icon:'⬅', label:'Alinear izquierda', action:()=>{ if(srcImg){ srcImg.style.float='left'; srcImg.style.margin='0 12px 8px 0'; }}},
+      { icon:'↔', label:'Centrar',            action:()=>{ if(srcImg){ srcImg.style.float=''; srcImg.style.display='block'; srcImg.style.margin='0 auto'; }}},
+      { icon:'➡', label:'Alinear derecha',    action:()=>{ if(srcImg){ srcImg.style.float='right'; srcImg.style.margin='0 0 8px 12px'; }}},
+      'sep',
+      { icon:'📋', label:'Copiar imagen', action:()=>{
+          const img=wrapper.querySelector('img');
+          fetch(img.src).then(r=>r.blob()).then(blob=>{
+            navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+          });
+      }},
+      'sep',
+      { icon:'🗑', label:'Eliminar imagen', action:()=>{
+          if(srcImg) srcImg.remove();
+          wrapper.remove();
+      }},
+    ]);
+  });
+
+  document.addEventListener('click',       cerrar);
+  document.addEventListener('keydown',     e=>{ if(e.key==='Escape') cerrar(); });
+})();
 </script>
 </body>
 </html>
