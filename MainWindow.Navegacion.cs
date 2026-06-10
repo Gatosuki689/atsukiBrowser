@@ -107,6 +107,7 @@ namespace atsukibrowser
                                            url.Contains("Capturas.html")   ? "Editor de Capturas" :
                                            url.Contains("AtsukiDocs.html")   ? "AtsukiDocs" :
                                            url.Contains("AtsukiNotes.html")   ? "AtsukiNotes" :
+                                           url.Contains("Ayuda.html")   ? "Ayuda" :
                                            titulo;
                     this.Title = tituloVentana == "Nueva pestaña"
                         ? "AtsukiBrowser"
@@ -120,9 +121,16 @@ namespace atsukibrowser
                     webView.ZoomFactor = _zoomPorDominio.TryGetValue(dominioZoom, out double z) ? z : 1.0;
                     _aplicandoZoom = false;
                 }
+                if (url.Contains("NuevaTab") || url.Contains("NuevaTabV2"))
+                {
+                    string script = $"document.documentElement.dataset.perfilId = '{_perfilActivo.Id}';";
+                    _ = webView.CoreWebView2.ExecuteScriptAsync(script);
+                }
             });
 
             ActualizarEstrellaFavorito();
+            if (_tabPreCalentada == null)
+                _ = Task.Run(() => Dispatcher.BeginInvoke(PreCalentarTab));
         }
 
         private void MainWindow_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -328,7 +336,7 @@ namespace atsukibrowser
             if (url.StartsWith("file:///"))
             {
                 // Nueva tab: barra vacía, como Chrome/Edge
-                if (url.Contains("NuevaTab.html"))
+                if (url.Contains("NuevaTab.html") || url.Contains("NuevaTabV2.html"))
                 {
                     _ignorarTextChanged = true;
                     UrlBar.Text = "";
@@ -355,6 +363,8 @@ namespace atsukibrowser
                     var u when u.Contains("Capturas.html")    => "atsuki://capturas",
                     var u when u.Contains("AtsukiDocs.html")    => "atsuki://documentos",
                     var u when u.Contains("AtsukiNotes.html") => "atsuki://notes",
+                    var u when u.Contains("Ayuda.html") => "atsuki://ayuda",
+                    var u when u.Contains("AtsukiDraw.html") => "atsuki://draw",
                     _ => url
                 };
 

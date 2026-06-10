@@ -202,6 +202,12 @@
               <button class="btn-exportar"
                 onclick="exportar('${ext.Id}')">Exportar</button>
           ` : ''}
+          ${esChrome && ext.OptionsPage ? `
+            <button class="btn-exportar"
+              onclick="abrirOpciones('${ext.ExtensionId}', '${ext.OptionsPage}')">
+              Opciones
+            </button>
+          ` : ''}
           ${ext.Id !== 'adblock' ? `
               <button class="btn-desinstalar"
                 onclick="desinstalar('${ext.Id}')">Desinstalar</button>
@@ -211,6 +217,11 @@
 
       lista.appendChild(card);
     });
+  }
+
+  function abrirOpciones(extensionId, optionsPage) {
+    if (!extensionId || !optionsPage) return;
+    window.chrome.webview.postMessage('navigate:chrome-extension://' + extensionId + '/' + optionsPage);
   }
 
   function toggleExt(id, activa) {

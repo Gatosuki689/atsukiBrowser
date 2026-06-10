@@ -621,20 +621,27 @@ function renderNotas() {
   const empty      = document.getElementById('empty');
 
   const todas = notasFiltradas();
-  const pinned = todas.filter(n => n.pinned);
-  const otras  = todas.filter(n => !n.pinned);
 
   const claseGrid = modoVista === 'lista' ? 'notas-grid lista' : 'notas-grid';
   gridPinned.className = claseGrid;
   gridNotas.className  = claseGrid;
-
   gridPinned.innerHTML = '';
   gridNotas.innerHTML  = '';
 
-  secPinned.style.display = (pinned.length > 0 && filtroActivo !== 'pinned') ? '' : 'none';
-
-  pinned.forEach(n => gridPinned.appendChild(crearTarjeta(n)));
-  otras.forEach(n => gridNotas.appendChild(crearTarjeta(n)));
+  if (filtroActivo === 'pinned') {
+    // En filtro Fijadas: mostrar todas en el grid normal, sin sección separada
+    secPinned.style.display = 'none';
+    gridNotas.style.display = '';
+    todas.forEach(n => gridNotas.appendChild(crearTarjeta(n)));
+  } else {
+    // En otros filtros: separar fijadas arriba y el resto abajo
+    const pinned = todas.filter(n => n.pinned);
+    const otras  = todas.filter(n => !n.pinned);
+    secPinned.style.display = pinned.length > 0 ? '' : 'none';
+    gridNotas.style.display = '';
+    pinned.forEach(n => gridPinned.appendChild(crearTarjeta(n)));
+    otras.forEach(n => gridNotas.appendChild(crearTarjeta(n)));
+  }
 
   empty.style.display = todas.length === 0 ? 'block' : 'none';
 }
@@ -843,6 +850,28 @@ window.chrome.webview.addEventListener('message', e => {
     notas = []; etiquetas = [];
     renderSidebar(); renderNotas();
   }
+  } else if (raw.startsWith('notes:chunk-load:')) {
+      const partes = raw.split(':', 4);
+      const idx    = parseInt(partes[1]);
+      const total  = parseInt(partes[2]);
+      const datos  = raw.slice(`notes:chunk-load:${partes[1]}:${partes[2]}:`.length);
+      
+      if (!window._loadChunks) window._loadChunks = '';
+      window._loadChunks += datos;
+      
+      if (idx === total - 1) {
+          try {
+              const data = JSON.parse(window._loadChunks);
+              window._loadChunks = '';
+              notas     = Array.isArray(data.notas)     ? data.notas     : [];
+              etiquetas = Array.isArray(data.etiquetas) ? data.etiquetas : [];
+              renderSidebar();
+              renderNotas();
+          } catch(e) {
+              console.error('Error cargando chunks:', e);
+              window._loadChunks = '';
+          }
+      }
   } else if (raw.startsWith('tema:')) {
     try {
       const t = JSON.parse(raw.slice('tema:'.length));
@@ -862,13 +891,14 @@ window.chrome.webview.addEventListener('message', e => {
       r.style.setProperty('--accent-b', bb);
     } catch {}
   }
+  if (raw.startsWith('notes:debug:')) {
+    alert(raw); // mostrar info de debug
+    return;
+  }
 });
 
 window.chrome.webview.postMessage('get:tema');
 
-setTimeout(() => {
-    window.chrome.webview.postMessage('notes:cargar');
-}, 50);
 </script>
 </body>
 </html>

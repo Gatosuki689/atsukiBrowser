@@ -170,7 +170,8 @@ namespace atsukibrowser
 
             var options = new CoreWebView2EnvironmentOptions
             {
-                AdditionalBrowserArguments = string.Join(" ", GetFlagsSegunHardware())
+                AdditionalBrowserArguments = string.Join(" ", GetFlagsSegunHardware()),
+                AreBrowserExtensionsEnabled = true
             };
 
             _env = await CoreWebView2Environment.CreateAsync(null, userDataFolder, options);
@@ -182,14 +183,34 @@ namespace atsukibrowser
                 AbrirNuevaTab(_urlInicio);
             else
                 AbrirNuevaTab(_urlNuevaTab);
+            CargarGrupos();
             _rendimiento.DatosActualizados += (datos) =>
             {
                 Dispatcher.Invoke(() =>
                 {
-                    string msg = $"rendimiento:{datos.Cpu},{datos.Ram},{datos.Disco},{datos.Red}";
-                    // Solo enviar a la tab activa
                     if (_activeTab >= 0 && _activeTab < _tabs.Count)
-                        _tabs[_activeTab].CoreWebView2?.PostWebMessageAsString(msg);
+                    {
+                        var tab = _tabs[_activeTab];
+                        string src = tab.Source?.ToString() ?? "";
+
+                        if (src.Contains("NuevaTabV2"))
+                        {
+                            // Formato que espera la V2
+                            string json = System.Text.Json.JsonSerializer.Serialize(new {
+                                cpu = datos.Cpu,
+                                ram = datos.Ram,
+                                dsk = datos.Disco,
+                                net = datos.Red
+                            });
+                            tab.CoreWebView2?.PostWebMessageAsString("perf:" + json);
+                        }
+                        else
+                        {
+                            // Formato V1
+                            tab.CoreWebView2?.PostWebMessageAsString(
+                                $"rendimiento:{datos.Cpu},{datos.Ram},{datos.Disco},{datos.Red}");
+                        }
+                    }
                     ActualizarWidgetsSidebar(datos);
                 });
             };
@@ -294,6 +315,58 @@ namespace atsukibrowser
             }
         }
 
+        private void TabBar_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Solo si el click fue en el área vacía de la tabbar, no en una tab
+            if (e.OriginalSource is not Grid && e.OriginalSource is not ScrollViewer) return;
+
+            var menu = new ContextMenu
+            {
+                Background      = new SolidColorBrush(Color.FromRgb(30, 30, 46)),
+                BorderBrush     = new SolidColorBrush(Color.FromRgb(61, 42, 110)),
+                BorderThickness = new Thickness(1)
+            };
+
+            // Mostrar/ocultar barra de grupos
+            var itemBarra = new MenuItem
+            {
+                Header          = _mostrarBarraGrupos ? "🗂  Ocultar barra de grupos" : "🗂  Mostrar barra de grupos",
+                Background      = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding         = new Thickness(12, 7, 12, 7),
+                Foreground      = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)),
+                FontSize        = 12
+            };
+            itemBarra.Click += (s, ev) =>
+            {
+                _mostrarBarraGrupos = !_mostrarBarraGrupos;
+                GruposBar.Visibility = _mostrarBarraGrupos ? Visibility.Visible : Visibility.Collapsed;
+                GuardarGrupos();
+            };
+            menu.Items.Add(itemBarra);
+
+            // Nuevo grupo directo desde la tabbar
+            menu.Items.Add(new Separator
+                { Background = new SolidColorBrush(Color.FromRgb(42, 26, 78)) });
+
+            var itemNuevoGrupo = new MenuItem
+            {
+                Header          = "➕  Nuevo grupo",
+                Background      = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Padding         = new Thickness(12, 7, 12, 7),
+                Foreground      = new SolidColorBrush(Color.FromArgb(220, 255, 255, 255)),
+                FontSize        = 12
+            };
+            itemNuevoGrupo.Click += (s, ev) => CrearGrupoConTab(-1); // -1 = sin tab inicial
+            menu.Items.Add(itemNuevoGrupo);
+
+            menu.PlacementTarget = TabBar;
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+            menu.IsOpen = true;
+            e.Handled = true;
+        }
+
         private void BtnMinimize_Click(object sender, RoutedEventArgs e)
             => WindowState = WindowState.Minimized;
 
@@ -362,6 +435,7 @@ namespace atsukibrowser
             _tabs.Clear();
             _tabButtons.Clear();
             _rendimiento.Dispose();
+            GuardarGrupos();
             base.OnClosed(e);
         }
 
@@ -380,6 +454,7 @@ namespace atsukibrowser
                     return;
                 }
             }
+            GuardarGrupos();
             base.OnClosing(e);
         }
 

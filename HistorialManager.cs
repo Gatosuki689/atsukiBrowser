@@ -18,6 +18,8 @@ namespace atsukibrowser
         private List<EntradaHistorial> _entradas = new();
         public IReadOnlyList<EntradaHistorial> Entradas => _entradas;
 
+        private System.Threading.CancellationTokenSource? _guardadoCts;  // ← agrega esto
+
         public HistorialManager(string carpeta)
         {
             _path = Path.Combine(carpeta, "historial.json");
@@ -29,22 +31,38 @@ namespace atsukibrowser
             if (string.IsNullOrWhiteSpace(url)) return;
             if (url.StartsWith("file:///")) return;
 
-            // Eliminar entradas duplicadas de la misma URL
             _entradas.RemoveAll(e => e.Url == url);
-
             _entradas.Insert(0, new EntradaHistorial
             {
-                Url = url,
+                Url    = url,
                 Titulo = string.IsNullOrWhiteSpace(titulo) ? url : titulo,
-                Fecha = DateTime.Now
+                Fecha  = DateTime.Now
             });
 
             if (_entradas.Count > 500)
                 _entradas.RemoveAt(_entradas.Count - 1);
 
-            // Guardar en background para no bloquear la UI
-            Task.Run(Guardar);
+            GuardarConDebounce();
         }
+
+        private void GuardarConDebounce()
+        {
+            _guardadoCts?.Cancel();
+            _guardadoCts = new System.Threading.CancellationTokenSource();
+            var token = _guardadoCts.Token;
+
+            Task.Run(async () =>
+            {
+                try
+                {
+                    await Task.Delay(1500, token);  // espera 1.5s antes de escribir
+                    if (!token.IsCancellationRequested)
+                        Guardar();
+                }
+                catch (TaskCanceledException) { }
+            });
+        }
+
 
         public void Limpiar()
         {

@@ -31,6 +31,8 @@ namespace atsukibrowser
         public bool   Activa      { get; set; } = true;
         public string RutaCarpeta { get; set; } = "";
         public WidgetConfig? Widget { get; set; } = null;
+        public string ExtensionId { get; set; } = "";
+        public string OptionsPage { get; set; } = "";
     }
 
     public class ExtensionesManager
@@ -76,14 +78,57 @@ namespace atsukibrowser
 
                 try
                 {
-                    var manifest = JsonSerializer.Deserialize<ManifestExtension>(
-                        File.ReadAllText(manifestPath),
-                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                    var doc = JsonDocument.Parse(File.ReadAllText(manifestPath)).RootElement;
 
-                    manifest.Id = Path.GetFileName(dir);
+                    ManifestExtension manifest;
+
+                    // Si tiene campo "Tipo" es una extensión Atsuki
+                    if (doc.TryGetProperty("Tipo", out _) || doc.TryGetProperty("tipo", out _))
+                    {
+                        manifest = JsonSerializer.Deserialize<ManifestExtension>(
+                            File.ReadAllText(manifestPath),
+                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                    }
+                    else
+                    {
+                        // Chrome/Edge — intentar leer metadata
+                        var metaPath = Path.Combine(dir, "atsuki_meta.json");
+                        if (File.Exists(metaPath))
+                        {
+                            manifest = JsonSerializer.Deserialize<ManifestExtension>(
+                                File.ReadAllText(metaPath),
+                                new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                        }
+                        else
+                        {
+                            // Leer campos Chrome nativos (con fallback a PascalCase por compatibilidad)
+                            string nombre = "";
+                            string desc   = "";
+                            string ver    = "1.0";
+
+                            if (doc.TryGetProperty("name",        out var n)) nombre = n.GetString() ?? "";
+                            else if (doc.TryGetProperty("Nombre",  out var n2)) nombre = n2.GetString() ?? "";
+
+                            if (doc.TryGetProperty("description",  out var d)) desc = d.GetString() ?? "";
+                            else if (doc.TryGetProperty("Descripcion", out var d2)) desc = d2.GetString() ?? "";
+
+                            if (doc.TryGetProperty("version",      out var v)) ver = v.GetString() ?? "1.0";
+                            else if (doc.TryGetProperty("Version", out var v2)) ver = v2.GetString() ?? "1.0";
+
+                            manifest = new ManifestExtension
+                            {
+                                Tipo        = "chrome",
+                                Nombre      = nombre,
+                                Descripcion = desc,
+                                Version     = ver,
+                                Activa      = true,
+                            };
+                        }
+                    }
+
+                    manifest.Id          = Path.GetFileName(dir);
                     manifest.RutaCarpeta = dir;
 
-                    // Restaurar estado guardado
                     if (estados.TryGetValue(manifest.Id, out bool activa))
                         manifest.Activa = activa;
 
@@ -154,6 +199,8 @@ namespace atsukibrowser
                 ext.Tipo,
                 ext.Activa,
                 ext.Widget,
+                ext.ExtensionId,
+                ext.OptionsPage,
                 Icono     = ext.Icono,
                 IconoData = GetIconoBase64(ext.Id)
             });
@@ -260,15 +307,67 @@ namespace atsukibrowser
             var ext = Extensiones.Find(e => e.Id == id);
             if (ext == null) return null;
 
-            string[] extensiones = { ".png", ".jpg", ".jpeg", ".webp", ".gif" };
+            if (ext.Tipo == "chrome")
+            {
+                try
+                {
+                    var manifestPath = Path.Combine(ext.RutaCarpeta, "manifest.json");
+                    if (!File.Exists(manifestPath)) return null;
+
+                    var doc = JsonDocument.Parse(File.ReadAllText(manifestPath)).RootElement;
+
+                    // Candidatos de ruta de icono en orden de preferencia
+                    var candidatos = new List<string>();
+
+                    // 1. icons: { "128": "...", "64": "..." }
+                    if (doc.TryGetProperty("icons", out var icons))
+                    {
+                        foreach (var size in new[] { "128", "64", "48", "32", "16" })
+                            if (icons.TryGetProperty(size, out var v))
+                                candidatos.Add(v.GetString() ?? "");
+                    }
+
+                    // 2. action.default_icon o browser_action.default_icon
+                    foreach (var actionKey in new[] { "action", "browser_action", "page_action" })
+                    {
+                        if (!doc.TryGetProperty(actionKey, out var action)) continue;
+                        if (action.TryGetProperty("default_icon", out var di))
+                        {
+                            if (di.ValueKind == JsonValueKind.String)
+                                candidatos.Add(di.GetString() ?? "");
+                            else if (di.ValueKind == JsonValueKind.Object)
+                                foreach (var size in new[] { "128", "64", "48", "32", "16" })
+                                    if (di.TryGetProperty(size, out var v))
+                                        candidatos.Add(v.GetString() ?? "");
+                        }
+                    }
+
+                    // Intentar cada candidato
+                    foreach (var rel in candidatos)
+                    {
+                        if (string.IsNullOrEmpty(rel)) continue;
+                        var ruta = Path.Combine(ext.RutaCarpeta, rel.TrimStart('/').Replace("/", "\\"));
+                        if (!File.Exists(ruta)) continue;
+                        var extImg = Path.GetExtension(ruta).ToLower();
+                        // SVG no se puede mostrar como base64 fácilmente en img tag, skip
+                        if (extImg == ".svg") continue;
+                        var mime = extImg is ".jpg" or ".jpeg" ? "image/jpeg" : $"image/{extImg.TrimStart('.')}";
+                        return $"data:{mime};base64,{Convert.ToBase64String(File.ReadAllBytes(ruta))}";
+                    }
+                }
+                catch { }
+                return null;
+            }
+
+            // Atsuki: buscar imagen en raíz
+            string[] extsImg = { ".png", ".jpg", ".jpeg", ".webp", ".gif" };
             foreach (var archivo in Directory.GetFiles(ext.RutaCarpeta))
             {
-                string extArchivo = Path.GetExtension(archivo).ToLower();
-                if (Array.IndexOf(extensiones, extArchivo) >= 0)
+                var extArchivo = Path.GetExtension(archivo).ToLower();
+                if (Array.IndexOf(extsImg, extArchivo) >= 0)
                 {
-                    string base64 = Convert.ToBase64String(File.ReadAllBytes(archivo));
-                    string mime = extArchivo == ".jpg" || extArchivo == ".jpeg"
-                        ? "image/jpeg" : $"image/{extArchivo.TrimStart('.')}";
+                    var base64 = Convert.ToBase64String(File.ReadAllBytes(archivo));
+                    var mime   = extArchivo is ".jpg" or ".jpeg" ? "image/jpeg" : $"image/{extArchivo.TrimStart('.')}";
                     return $"data:{mime};base64,{base64}";
                 }
             }

@@ -133,6 +133,22 @@ namespace atsukibrowser
             Guardar();
         }
 
+        public void SetAccent(string accent)
+        {
+            _temaActivo = new Tema
+            {
+                Id       = "custom",
+                Nombre   = "Custom",
+                Accent   = accent,
+                Bg       = _temaActivo.Bg,
+                Surface  = _temaActivo.Surface,
+                Surface2 = _temaActivo.Surface2,
+                Font     = _temaActivo.Font,
+                EsCustom = true
+            };
+            Guardar();
+        }
+
         // ── Serializar para enviar al HTML ───────────────────
         public string ToJson()
         {

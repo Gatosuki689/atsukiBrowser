@@ -21,6 +21,42 @@ namespace atsukibrowser
     public partial class MainWindow : Window
     {
         public void AbrirNuevaTabPublic(string url) => AbrirNuevaTab(url);
+        private async void PreCalentarTab()
+        {
+            if (_tabPreCalentada != null) return;
+            if (_env == null) return;
+
+            var wv = new WebView2();
+            wv.Visibility = Visibility.Collapsed;
+            BrowserContainer.Children.Add(wv);
+            try
+            {
+                await wv.EnsureCoreWebView2Async(_env);
+                wv.CoreWebView2.Settings.IsStatusBarEnabled        = false;
+                wv.CoreWebView2.Settings.IsPasswordAutosaveEnabled = false;
+                wv.CoreWebView2.Settings.IsGeneralAutofillEnabled  = false;
+                wv.CoreWebView2.Profile.PreferredTrackingPreventionLevel =
+                    Microsoft.Web.WebView2.Core.CoreWebView2TrackingPreventionLevel.None;
+
+                // Cargar extensiones Chrome una sola vez en el perfil
+                if (!_perfiles.Activo.EsInvitado && !_extensionesChromeCargadas)
+                {
+                    var rutas = _extensiones.GetExtensionesChrome();
+                    if (rutas.Count > 0)
+                    {
+                        await Task.WhenAll(rutas.Select(async ruta =>
+                        {
+                            try { await wv.CoreWebView2.Profile.AddBrowserExtensionAsync(ruta); }
+                            catch { }
+                        }));
+                    }
+                    _extensionesChromeCargadas = true;
+                }
+
+                _tabPreCalentada = wv;
+            }
+            catch { BrowserContainer.Children.Remove(wv); }
+        }
         private async void AbrirNuevaTab(string url = "")
         {
             // Límite de pestañas
@@ -37,9 +73,21 @@ namespace atsukibrowser
                 url = _urlNuevaTab;
             }
 
-            var webView = new WebView2();
-            webView.Visibility = Visibility.Hidden;
-            BrowserContainer.Children.Add(webView);
+            WebView2 webView;
+            if (_tabPreCalentada != null)
+            {
+                webView = _tabPreCalentada;
+                _tabPreCalentada = null;
+                webView.Visibility = Visibility.Hidden;
+                // Lanzar pre-calentado del siguiente en background
+                _ = Task.Run(() => Dispatcher.BeginInvoke(PreCalentarTab));
+            }
+            else
+            {
+                webView = new WebView2();
+                webView.Visibility = Visibility.Hidden;
+                BrowserContainer.Children.Add(webView);
+            }
 
             if (_env != null)
             {
@@ -131,18 +179,6 @@ namespace atsukibrowser
                 };
             }
 
-            // ── Cargar extensiones Chrome/Edge (no en modo invitado) ──
-            if (!_perfiles.Activo.EsInvitado)
-            {
-                foreach (var ruta in _extensiones.GetExtensionesChrome())
-                {
-                    try
-                    {
-                        await webView.CoreWebView2.Profile.AddBrowserExtensionAsync(ruta);
-                    }
-                    catch { }
-                }
-            }
            webView.CoreWebView2.ContextMenuRequested += async (s, args) =>
             {
                 var deferral = args.GetDeferral();
@@ -329,6 +365,14 @@ namespace atsukibrowser
                     ctxMenu.Items.Add(CrearSep());
                     ctxMenu.Items.Add(CrearItem(_modoZen ? "🧘  Salir del Modo Zen" : "🧘  Modo Zen", 
                         "Ctrl+Shift+Z", () => ToggleModoZen()));
+                        ctxMenu.Items.Add(CrearItem(                                          // ← agregar aquí
+                        _mostrarBarraGrupos ? "🗂  Ocultar barra de grupos" : "🗂  Mostrar barra de grupos",
+                        "", () =>
+                    {
+                        _mostrarBarraGrupos = !_mostrarBarraGrupos;
+                        GruposBar.Visibility = _mostrarBarraGrupos ? Visibility.Visible : Visibility.Collapsed;
+                        GuardarGrupos();
+                    }));
                     ctxMenu.Items.Add(CrearItem("📄  Ver código fuente", "", () =>
                         AbrirNuevaTab("view-source:" + paginaUrl)));
                     ctxMenu.Items.Add(CrearItem("📌  Añadir al sidebar", "", () =>
@@ -377,7 +421,7 @@ namespace atsukibrowser
             webView.CoreWebView2.WebMessageReceived += (s, args) =>
             {
                 string msg = args.TryGetWebMessageAsString();
-
+                
                 if (msg == "get:historial")
                 {
                     var json = System.Text.Json.JsonSerializer.Serialize(_historial.Entradas);
@@ -434,6 +478,26 @@ namespace atsukibrowser
                 {
                     Dispatcher.Invoke(() => webView.Source = new Uri(_urlNotes));
                 }
+                else if (msg == "navigate:wallpapers")
+                {
+                    string capPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                                                "Resources", "AtsukiWallpapers.html");
+                    Dispatcher.Invoke(() =>
+                        webView.Source = new Uri("file:///" + capPath.Replace("\\", "/")));
+                }
+                else if (msg == "navigate:palette")
+                {
+                    string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "AtsukiPalette.html");
+                    Dispatcher.Invoke(() => webView.Source = new Uri("file:///" + path.Replace("\\", "/")));
+                }
+                else if (msg == "navigate:ayuda")
+                {
+                    Dispatcher.Invoke(() => webView.Source = new Uri(_urlAyuda));
+                }
+                else if (msg == "navigate:draw")
+                {
+                    Dispatcher.Invoke(() => webView.Source = new Uri(_urlDraw));
+                }
                 else if (msg == "get:dials")
                 {
                     var json = System.Text.Json.JsonSerializer.Serialize(_dials);
@@ -442,7 +506,8 @@ namespace atsukibrowser
                 else if (msg.StartsWith("navigate:"))
                 {
                     string navUrl = msg.Substring("navigate:".Length);
-                    if (!navUrl.StartsWith("http://") && !navUrl.StartsWith("https://") && !navUrl.StartsWith("file:///"))
+                    if (!navUrl.StartsWith("http://") && !navUrl.StartsWith("https://")
+                        && !navUrl.StartsWith("file:///") && !navUrl.StartsWith("chrome-extension://"))
                         navUrl = "https://" + navUrl;
                     if (Uri.TryCreate(navUrl, UriKind.Absolute, out var uri))
                         Dispatcher.Invoke(() => webView.Source = uri);
@@ -477,6 +542,14 @@ namespace atsukibrowser
                         AplicarTemaUI(_temas.TemaActivo);
                         PropagaTema();
                     }
+                }
+                else if (msg.StartsWith("palette:aplicar-tema:"))
+                {
+                    var data   = JsonSerializer.Deserialize<JsonElement>(msg.Substring("palette:aplicar-tema:".Length));
+                    string accent = data.GetProperty("accent").GetString() ?? "#7c3aed";
+                    _temas.SetAccent(accent);
+                    AplicarTemaUI(_temas.TemaActivo);
+                    PropagaTema();
                 }
                 else if (msg == "get:extensiones")
                 {
@@ -543,6 +616,91 @@ namespace atsukibrowser
                         webView.CoreWebView2.PostWebMessageAsString("extensiones:" + _extensiones.ToJson());
                     });
                     Dispatcher.Invoke(SincronizarExtensionesSidebar);
+                }
+                else if (msg == "extension:instalar:chrome")
+                {
+                    Dispatcher.BeginInvoke(new Action(async () =>
+                    {
+                        var dialog = new Microsoft.Win32.OpenFileDialog
+                        {
+                            Title           = "Selecciona el manifest.json de la extensión",
+                            Filter          = "Manifest (manifest.json)|manifest.json",
+                            CheckFileExists = true
+                        };
+                        if (dialog.ShowDialog() != true) return;
+
+                        string carpeta = Path.GetDirectoryName(dialog.FileName)!;
+
+                        // Leer manifest Chrome original
+                        string nombre  = Path.GetFileName(carpeta);
+                        string version = "1.0";
+                        string desc    = "";
+                        try
+                        {
+                            var manifest = JsonDocument.Parse(File.ReadAllText(dialog.FileName)).RootElement;
+                            if (manifest.TryGetProperty("name",        out var n)) nombre  = n.GetString() ?? nombre;
+                            if (manifest.TryGetProperty("version",     out var v)) version = v.GetString() ?? version;
+                            if (manifest.TryGetProperty("description", out var d)) desc    = d.GetString() ?? "";
+                        }
+                        catch { }
+
+                        // Resolver __MSG_*__ desde _locales
+                        nombre = ResolverMsgChrome(nombre, carpeta);
+                        desc   = ResolverMsgChrome(desc,   carpeta);
+
+                        // Copiar carpeta completa SIN tocar manifest.json
+                        string id      = Guid.NewGuid().ToString("N")[..8];
+                        string destino = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            "AtsukiBrowser", "Extensions", id);
+                        Directory.CreateDirectory(destino);
+                        CopiarCarpetaExt(carpeta, destino);
+
+                        // Cargar en todas las tabs y obtener el ID real
+                        string extensionId = "";
+                        foreach (var tab in _tabs)
+                        {
+                            try
+                            {
+                                var ext = await tab.CoreWebView2.Profile.AddBrowserExtensionAsync(destino);
+                                if (!string.IsNullOrEmpty(ext.Id))
+                                    extensionId = ext.Id;
+                            }
+                            catch { }
+                        }
+
+                        // Actualizar meta con el ID real y la página de opciones
+                        string optionsPage = "";
+                        try
+                        {
+                            var chromeManifest = JsonDocument.Parse(File.ReadAllText(dialog.FileName)).RootElement;
+                            if (chromeManifest.TryGetProperty("options_page", out var op))
+                                optionsPage = op.GetString() ?? "";
+                            else if (chromeManifest.TryGetProperty("options_ui", out var oui))
+                                if (oui.TryGetProperty("page", out var ouip))
+                                    optionsPage = ouip.GetString() ?? "";
+                        }
+                        catch { }
+
+                        var meta = new {
+                            Nombre      = nombre,
+                            Descripcion = desc,
+                            Version     = version,
+                            Tipo        = "chrome",
+                            Activa      = true,
+                            Icono       = "",
+                            ExtensionId = extensionId,
+                            OptionsPage = optionsPage
+                        };
+                        File.WriteAllText(
+                            Path.Combine(destino, "atsuki_meta.json"),
+                            JsonSerializer.Serialize(meta, new JsonSerializerOptions { WriteIndented = true }));
+
+                        _extensiones.Cargar();
+                        _extensionesChromeCargadas = false;
+                        webView.CoreWebView2.PostWebMessageAsString("extensiones:" + _extensiones.ToJson());
+                        SincronizarExtensionesSidebar();
+                    }));
                 }
                 else if (msg.StartsWith("extension:exportar:"))
                 {
@@ -680,6 +838,31 @@ namespace atsukibrowser
                     string path = Path.Combine(_carpetaPerfil, "fondo_opacidad.txt");
                     string op = File.Exists(path) ? File.ReadAllText(path).Trim() : "35";
                     webView.CoreWebView2.PostWebMessageAsString("fondo:opacidad:" + op);
+                }
+                else if (msg.StartsWith("wallpaper:set:"))
+                {
+                    string url = msg.Substring("wallpaper:set:".Length);
+                    _ = Task.Run(async () => {
+                        try {
+                            // Descargar imagen a carpeta de perfil
+                            string ext      = System.IO.Path.GetExtension(new Uri(url).AbsolutePath);
+                            if (string.IsNullOrEmpty(ext)) ext = ".jpg";
+                            string destino  = System.IO.Path.Combine(_carpetaPerfil, "wallpaper" + ext);
+
+                            using var http   = new System.Net.Http.HttpClient();
+                            var bytes        = await http.GetByteArrayAsync(url);
+                            await System.IO.File.WriteAllBytesAsync(destino, bytes);
+
+                            // Guardar como fondo activo y propagar
+                            string fondoPath = System.IO.Path.Combine(_carpetaPerfil, "fondo.txt");
+                            await System.IO.File.WriteAllTextAsync(fondoPath, destino);
+
+                            Dispatcher.Invoke(() => {
+                                foreach (var tab in _tabs)
+                                    tab.CoreWebView2?.PostWebMessageAsString("fondo:" + destino);
+                            });
+                        } catch { }
+                    });
                 }
                 else if (msg == "get:sidebar")
                 {
@@ -1618,7 +1801,7 @@ namespace atsukibrowser
                         } catch { }
                     });
                 }
-                else if (msg == "capturas:eliminar:" + msg.Substring("capturas:eliminar:".Length))
+                else if (msg.StartsWith("capturas:eliminar:"))
                 {
                     string ruta = msg.Substring("capturas:eliminar:".Length);
                     try { if (File.Exists(ruta)) File.Delete(ruta); } catch { }
@@ -1703,10 +1886,6 @@ namespace atsukibrowser
                 {
                     Dispatcher.Invoke(() =>
                     {
-                        // Quitar foco del WebView antes de abrir el diálogo
-                        this.Focus();
-                        System.Windows.Input.Keyboard.ClearFocus();
-                        System.Windows.MessageBox.Show("INVOKE EJECUTADO");
                         var dlg = new Microsoft.Win32.OpenFileDialog
                         {
                             Title  = "Abrir documento",
@@ -1845,9 +2024,19 @@ namespace atsukibrowser
                 else if (msg == "notes:cargar")
                 {
                     string path = Path.Combine(_carpetaPerfil, "notes.json");
-                    string json = File.Exists(path) ? File.ReadAllText(path) : "{\"notas\":[],\"etiquetas\":[]}";
-                    webView.CoreWebView2.PostWebMessageAsString("notes:datos:" + json);
-                    webView.CoreWebView2.PostWebMessageAsString("tema:" + _temas.ToJson());
+                    string json = File.Exists(path)
+                        ? File.ReadAllText(path)
+                        : "{\"notas\":[],\"etiquetas\":[]}";
+
+                    try
+                    {
+                        webView.CoreWebView2.PostWebMessageAsString("notes:debug:" + path + "|len:" + json.Length);
+                        webView.CoreWebView2.PostWebMessageAsString("notes:datos:" + json);
+                    }
+                    catch (Exception ex)
+                    {
+                        webView.CoreWebView2.PostWebMessageAsString("notes:debug:ERROR:" + ex.Message);
+                    }
                 }
                 else if (msg.StartsWith("notes:guardar:"))
                 {
@@ -1873,6 +2062,49 @@ namespace atsukibrowser
                         _notesChunks.Remove(webView);
                         File.WriteAllText(Path.Combine(_carpetaPerfil, "notes.json"), json);
                     }
+                }
+                else if (msg.StartsWith("nuevatab:layout:"))
+                {
+                    string val = msg.Substring("nuevatab:layout:".Length);
+                    File.WriteAllText(Path.Combine(_carpetaPerfil, "nuevatab_layout.txt"), val);
+
+                    // Actualizar _urlNuevaTab en caliente
+                    string res2 = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
+                    _urlNuevaTab = val == "v2"
+                        ? "file:///" + Path.Combine(res2, "NuevaTabV2.html").Replace("\\", "/")
+                        : "file:///" + Path.Combine(res2, "NuevaTab.html").Replace("\\", "/");
+
+                    // Notificar a todas las nuevaTab abiertas para que cambien en caliente
+                    foreach (var tab in _tabs)
+                        tab.CoreWebView2?.PostWebMessageAsString("nuevatab:layout:" + val);
+                }
+                else if (msg == "get:v2:posiciones")
+                {
+                    string path = Path.Combine(_carpetaPerfil, "v2_posiciones.json");
+                    string val = File.Exists(path) ? File.ReadAllText(path).Trim() : "{}";
+                    webView.CoreWebView2.PostWebMessageAsString("v2:posiciones:" + val);
+                }
+                else if (msg.StartsWith("v2:posiciones:"))
+                {
+                    string val = msg.Substring("v2:posiciones:".Length);
+                    File.WriteAllText(Path.Combine(_carpetaPerfil, "v2_posiciones.json"), val);
+                }
+                else if (msg.StartsWith("wallhaven:search:"))
+                {
+                    string queryParams = msg.Substring("wallhaven:search:".Length);
+                    _ = Task.Run(async () => {
+                        try {
+                            using var http = new System.Net.Http.HttpClient();
+                            http.DefaultRequestHeaders.Add("User-Agent", "AtsukiBrowser/1.0");
+                            var url      = "https://wallhaven.cc/api/v1/search?" + queryParams;
+                            var response = await http.GetStringAsync(url);
+                            Dispatcher.Invoke(() =>
+                                webView.CoreWebView2.PostWebMessageAsString("wallhaven:results:" + response));
+                        } catch (Exception ex) {
+                            Dispatcher.Invoke(() =>
+                                webView.CoreWebView2.PostWebMessageAsString("wallhaven:error:" + ex.Message));
+                        }
+                    });
                 }
             };
 
@@ -1981,6 +2213,32 @@ namespace atsukibrowser
 
                 // Inyectar widgets de extensiones en NuevaTab
                 string urlActual = webView.Source?.ToString() ?? "";
+                if (urlActual.Contains("AtsukiNotes.html"))
+                {
+                    string notesPath = Path.Combine(_carpetaPerfil, "notes.json");
+                    string notesJson = File.Exists(notesPath)
+                        ? File.ReadAllText(notesPath)
+                        : "{\"notas\":[],\"etiquetas\":[]}";
+                    
+                    const int CHUNK = 512 * 1024;
+                    if (notesJson.Length <= CHUNK)
+                        webView.CoreWebView2?.PostWebMessageAsString("notes:datos:" + notesJson);
+                    else
+                    {
+                        int total = (int)Math.Ceiling((double)notesJson.Length / CHUNK);
+                        for (int i = 0; i < total; i++)
+                        {
+                            string chunk = notesJson.Substring(i * CHUNK, Math.Min(CHUNK, notesJson.Length - i * CHUNK));
+                            webView.CoreWebView2?.PostWebMessageAsString($"notes:chunk-load:{i}:{total}:{chunk}");
+                        }
+                    }
+                }
+                else if (urlActual.Contains("AtsukiDocs.html"))
+                {
+                    string recPath = Path.Combine(_carpetaPerfil, "docs_recientes.json");
+                    string recJson = File.Exists(recPath) ? File.ReadAllText(recPath) : "[]";
+                    webView.CoreWebView2?.PostWebMessageAsString("docs:recientes:" + recJson);
+                }
                 if (urlActual.Contains("NuevaTab.html"))
                 {
                     var widgets = _extensiones.GetWidgetsActivos()
@@ -3083,6 +3341,26 @@ namespace atsukibrowser
             }
 
             mainPart.Document.Save();
+        }
+
+        private string ResolverMsgChrome(string valor, string carpeta)
+        {
+            if (!valor.StartsWith("__MSG_")) return valor;
+            string key = valor.Replace("__MSG_", "").Replace("__", "");
+            foreach (var locale in new[] { "es", "en", "en_US" })
+            {
+                string path = Path.Combine(carpeta, "_locales", locale, "messages.json");
+                if (!File.Exists(path)) continue;
+                try
+                {
+                    var doc = JsonDocument.Parse(File.ReadAllText(path)).RootElement;
+                    if (doc.TryGetProperty(key, out var msg) &&
+                        msg.TryGetProperty("message", out var m))
+                        return m.GetString() ?? valor;
+                }
+                catch { }
+            }
+            return valor;
         }
     }
 }

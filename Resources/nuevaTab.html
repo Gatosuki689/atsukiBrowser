@@ -824,6 +824,11 @@
     transform: translateY(-4px) scale(1.05) !important;
   }
 
+  #w-pomodoro {
+    max-height: none;
+    overflow: visible;
+  }
+
 </style>
 </head>
 <body>
@@ -1027,18 +1032,45 @@
     </div>
 
     <div class="widget" id="w-pomodoro">
-      <div class="widget-title">⏱ Temporizador</div>
+      <div class="widget-title">⏱ Temporizador
+        <button id="pomo-config-btn" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:13px;margin-left:auto;padding:0 4px;transition:color 0.15s" title="Personalizar tiempos">⚙</button>
+      </div>
       <div id="w-pomodoro-body">
         <div id="w-pomodoro-modes">
-          <span class="pomo-mode active" data-mins="25" data-label="Trabajo">Trabajo</span>
-          <span class="pomo-mode" data-mins="5" data-label="Descanso corto">Descanso</span>
-          <span class="pomo-mode" data-mins="15" data-label="Descanso largo">Largo</span>
+          <span class="pomo-mode active" data-key="trabajo">Trabajo</span>
+          <span class="pomo-mode" data-key="descanso">Descanso</span>
+          <span class="pomo-mode" data-key="largo">Custom</span>
         </div>
         <div id="w-pomodoro-time">25:00</div>
         <div id="w-pomodoro-label">Listo para empezar</div>
         <div id="w-pomodoro-controls">
           <button class="pomo-btn" id="pomo-start">Iniciar</button>
           <button class="pomo-btn" id="pomo-reset">Reset</button>
+        </div>
+        <!-- Panel de configuración -->
+        <div id="pomo-config" style="display:none;flex-direction:column;gap:8px;width:100%;margin-top:8px">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span style="font-size:11px;color:var(--muted);width:80px">Trabajo</span>
+            <input type="number" id="pomo-cfg-trabajo" min="1" max="120" value="25"
+              style="width:50px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px;text-align:center"/>
+            <span style="font-size:10px;color:var(--muted)">min</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span style="font-size:11px;color:var(--muted);width:80px">Descanso</span>
+            <input type="number" id="pomo-cfg-descanso" min="1" max="60" value="5"
+              style="width:50px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px;text-align:center"/>
+            <span style="font-size:10px;color:var(--muted)">min</span>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <span style="font-size:11px;color:var(--muted);width:80px">Custom</span>
+            <input type="number" id="pomo-cfg-largo" min="1" max="120" value="15"
+              style="width:50px;background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:4px;padding:3px 6px;font-size:11px;text-align:center"/>
+            <span style="font-size:10px;color:var(--muted)">min</span>
+          </div>
+          <button id="pomo-cfg-guardar"
+            style="background:var(--accent);border:none;color:white;border-radius:6px;padding:6px;font-size:11px;cursor:pointer;font-family:'Segoe UI',sans-serif;transition:background 0.15s">
+            Guardar
+          </button>
         </div>
       </div>
     </div>
@@ -1588,6 +1620,10 @@
         return;
     }
     if (raw.startsWith('tema:'))  { aplicarTema(JSON.parse(raw.slice(5))); }
+    if (raw.startsWith('nuevatab:layout:')) {
+      if (raw.trim().endsWith('v2')) window.location.href = window.location.href.replace('NuevaTab.html', 'NuevaTabV2.html');
+      return;
+    }
     if (raw.startsWith('fondo:opacidad:')) {
       const op = parseInt(raw.slice('fondo:opacidad:'.length));
       const img = document.getElementById('bg-image');
@@ -1767,26 +1803,41 @@
 
   // ── Widget Pomodoro ────────────────────────────────
   (function() {
-    let totalSecs = 25 * 60;
-    let remaining = totalSecs;
+    let timer   = null;
     let running = false;
-    let timer = null;
-    let label = 'Trabajo';
 
-    const timeEl  = document.getElementById('w-pomodoro-time');
-    const labelEl = document.getElementById('w-pomodoro-label');
+    // Tiempos personalizables — cargar desde localStorage
+    const pomoCfg = JSON.parse(localStorage.getItem('pomo_cfg') ?? 'null') ?? {
+      trabajo: 25, descanso: 5, largo: 15
+    };
+
+    const pomoMins = {
+      trabajo:  pomoCfg.trabajo,
+      descanso: pomoCfg.descanso,
+      largo:    pomoCfg.largo
+    };
+    const pomoLabels = {
+      trabajo: 'Trabajo', descanso: 'Descanso corto', largo: 'Temporizador'
+    };
+
+    let modoActual = 'trabajo';
+    let totalSecs  = pomoMins[modoActual] * 60;
+    let remaining  = totalSecs;
+
+    const timeEl   = document.getElementById('w-pomodoro-time');
+    const labelEl  = document.getElementById('w-pomodoro-label');
     const startBtn = document.getElementById('pomo-start');
     const resetBtn = document.getElementById('pomo-reset');
 
-    function fmt(s) {
-      const m = String(Math.floor(s / 60)).padStart(2,'0');
-      const sec = String(s % 60).padStart(2,'0');
-      return `${m}:${sec}`;
-    }
+    // Sincronizar inputs con valores guardados
+    document.getElementById('pomo-cfg-trabajo').value  = pomoCfg.trabajo;
+    document.getElementById('pomo-cfg-descanso').value = pomoCfg.descanso;
+    document.getElementById('pomo-cfg-largo').value    = pomoCfg.largo;
 
-    function render() {
-      timeEl.textContent = fmt(remaining);
+    function fmt(s) {
+      return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
     }
+    function render() { timeEl.textContent = fmt(remaining); }
 
     function tick() {
       if (remaining <= 0) {
@@ -1795,14 +1846,12 @@
         startBtn.textContent = 'Iniciar';
         startBtn.classList.remove('active');
         labelEl.textContent = '¡Tiempo!';
-        // Notificación
         if (Notification.permission === 'granted')
-          new Notification('AtsukiBrowser', { body: `${label} terminado.` });
+          new Notification('AtsukiBrowser', { body: `${pomoLabels[modoActual]} terminado.` });
         return;
       }
       remaining--;
       render();
-      labelEl.textContent = running ? label + ' en curso...' : label;
     }
 
     startBtn.addEventListener('click', () => {
@@ -1816,7 +1865,7 @@
         running = true;
         startBtn.textContent = 'Pausar';
         startBtn.classList.add('active');
-        labelEl.textContent = label + ' en curso...';
+        labelEl.textContent = pomoLabels[modoActual] + ' en curso...';
         timer = setInterval(tick, 1000);
       }
     });
@@ -1835,9 +1884,9 @@
       btn.addEventListener('click', () => {
         document.querySelectorAll('.pomo-mode').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        totalSecs = parseInt(btn.dataset.mins) * 60;
-        remaining = totalSecs;
-        label = btn.dataset.label;
+        modoActual = btn.dataset.key;
+        totalSecs  = pomoMins[modoActual] * 60;
+        remaining  = totalSecs;
         clearInterval(timer);
         running = false;
         startBtn.textContent = 'Iniciar';
@@ -1847,10 +1896,36 @@
       });
     });
 
-    // Pedir permiso notificaciones
-    if (Notification.permission === 'default')
-      Notification.requestPermission();
+    // Config panel
+    document.getElementById('pomo-config-btn').addEventListener('click', () => {
+      const panel = document.getElementById('pomo-config');
+      panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    });
 
+    document.getElementById('pomo-cfg-guardar').addEventListener('click', () => {
+      const t = Math.max(1, parseInt(document.getElementById('pomo-cfg-trabajo').value)  || 25);
+      const d = Math.max(1, parseInt(document.getElementById('pomo-cfg-descanso').value) || 5);
+      const l = Math.max(1, parseInt(document.getElementById('pomo-cfg-largo').value)    || 15);
+
+      pomoMins.trabajo  = t;
+      pomoMins.descanso = d;
+      pomoMins.largo    = l;
+      localStorage.setItem('pomo_cfg', JSON.stringify({ trabajo: t, descanso: d, largo: l }));
+
+      // Resetear con nuevo tiempo si el modo activo cambió
+      totalSecs = pomoMins[modoActual] * 60;
+      remaining = totalSecs;
+      clearInterval(timer);
+      running = false;
+      startBtn.textContent = 'Iniciar';
+      startBtn.classList.remove('active');
+      labelEl.textContent = 'Listo para empezar';
+      render();
+
+      document.getElementById('pomo-config').style.display = 'none';
+    });
+
+    if (Notification.permission === 'default') Notification.requestPermission();
     render();
   })();
 
@@ -2390,6 +2465,10 @@
     { nombre: 'Ajustes',   emoji: '⚙️', url: 'navigate:ajustes'    },
     { nombre: 'Docs',     emoji: '📝', url: 'navigate:docs'      },
     { nombre: 'Notes',     emoji: '📝', url: 'navigate:notes'      },
+    { nombre: 'Wallpapers',     emoji: '🌆', url: 'navigate:wallpapers'      },
+    { nombre: 'Ayuda',     emoji: '❓', url: 'navigate:ayuda'      },
+    { nombre: 'Draw',     emoji: '🎨', url: 'navigate:draw'      },
+    { nombre: 'Paletas de colores',     emoji: '🖋', url: 'navigate:palette'      },
   ];
 
   APPS.forEach(app => {
@@ -2422,6 +2501,9 @@
     if (!appsPanel.contains(e.target) && e.target !== appsBtn)
       appsPanel.style.display = 'none';
   });
+
+
+
 </script>
   <div id="search-suggestions"></div>
 </body>

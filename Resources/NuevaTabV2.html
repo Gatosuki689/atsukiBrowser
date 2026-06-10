@@ -1,0 +1,1230 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>Nueva pestaña</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --accent: #7c3aed;
+  --accent2: #a78bfa;
+  --bg: #0d0d14;
+  --surface: #13131f;
+  --surface2: #1a1a2e;
+  --border: rgba(124,58,237,0.2);
+  --text: rgba(255,255,255,0.85);
+  --muted: rgba(255,255,255,0.35);
+  --widget-opac: 0.75;
+  --cell: 88px;
+  --gap: 10px;
+}
+
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  width: 100vw; height: 100vh;
+  overflow: hidden; position: relative;
+}
+
+/* ── Fondo grid sutil ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    repeating-linear-gradient(90deg, transparent, transparent 80px, rgba(124,58,237,0.015) 80px, rgba(124,58,237,0.015) 81px),
+    repeating-linear-gradient(180deg, transparent, transparent 80px, rgba(124,58,237,0.015) 80px, rgba(124,58,237,0.015) 81px);
+  pointer-events: none; z-index: 0;
+}
+
+/* ── Imagen de fondo ── */
+#bg-image {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover; z-index: 0;
+  opacity: 0.35; pointer-events: none; display: none;
+}
+body.has-bg #bg-image { display: block; }
+body.has-bg::before { opacity: 0.3; }
+
+/* ── Katakana ── */
+#katakana-canvas {
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 0;
+  opacity: 0.07;
+}
+
+/* ── Grid overlay — solo visible al arrastrar ── */
+#grid-overlay {
+  position: fixed; inset: 0;
+  z-index: 10; pointer-events: none;
+  opacity: 0; transition: opacity 0.2s;
+}
+#grid-overlay.visible { opacity: 1; }
+
+.grid-cell {
+  position: absolute; border-radius: 4px;
+  background: rgba(124,58,237,0.03);
+  border: 1px dashed rgba(124,58,237,0.15);
+  transition: background 0.15s;
+}
+.grid-cell.highlight {
+  background: rgba(124,58,237,0.12);
+  border-color: rgba(124,58,237,0.45);
+  border-style: solid;
+}
+
+/* ── Canvas widgets ── */
+#canvas {
+  position: fixed; inset: 0;
+  z-index: 20; pointer-events: none;
+}
+
+#canvas { pointer-events: none; z-index: 1; }
+.widget, .widget-libre { z-index: 10; }
+
+body.edit-mode #grid-overlay.visible { z-index: 5; pointer-events: none; }
+body.edit-mode #btn-add { display: flex; }
+
+/* ── Widget base con caja ── */
+.widget {
+  position: absolute;
+  pointer-events: all;
+  cursor: default;
+  user-select: none;
+  border-radius: 12px;
+  background: rgba(19,19,31,var(--widget-opac));
+  border: 1px solid var(--border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  overflow: hidden;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.widget::before {
+  content: '';
+  position: absolute; left: 0; top: 0;
+  width: 3px; height: 100%;
+  background: var(--accent);
+  border-radius: 12px 0 0 12px;
+  z-index: 1;
+}
+.widget:hover {
+  border-color: rgba(124,58,237,0.35);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+}
+body.edit-mode .widget { cursor: grab; }
+body.edit-mode .widget.dragging {
+  cursor: grabbing;
+  border-color: rgba(124,58,237,0.6);
+  box-shadow: 0 20px 52px rgba(124,58,237,0.2), 0 0 0 2px rgba(124,58,237,0.3);
+  z-index: 100; opacity: 0.93; transition: none;
+}
+
+/* ── Widget libre (reloj, búsqueda, dials) ── */
+.widget-libre {
+  background: transparent !important;
+  border: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+}
+.widget-libre::before { display: none; }
+.widget-libre:hover { box-shadow: none !important; border-color: transparent !important; }
+body.edit-mode .widget-libre { cursor: grab; }
+body.edit-mode .widget-libre.dragging {
+  box-shadow: none !important;
+  border: 1px dashed rgba(124,58,237,0.4) !important;
+  background: rgba(124,58,237,0.05) !important;
+  border-radius: 12px !important;
+}
+
+/* ── Botón editar ── */
+#btn-editar {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: rgba(19,19,31,0.8);
+  border: 1px solid rgba(124,58,237,0.3);
+  color: rgba(255,255,255,0.5);
+  font-size: 16px;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; z-index: 100;
+}
+#btn-editar:hover { border-color: var(--accent); color: #fff; }
+body.edit-mode #btn-editar {
+  background: rgba(124,58,237,0.3);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ── Ocultar toolbar ── */
+#toolbar, #add-panel { display: none !important; }
+
+/* ── Reloj ── */
+.ntv2-clock {
+  font-size: 72px; font-weight: 200;
+  letter-spacing: -4px; color: white;
+  line-height: 1; text-shadow: 0 0 60px rgba(124,58,237,0.2);
+  text-align: center;
+}
+.ntv2-clock .sec { font-size: 28px; color: var(--muted); }
+.ntv2-clock .acc { color: var(--accent); }
+.ntv2-date {
+  font-size: 13px; color: var(--muted);
+  letter-spacing: 0.08em; margin-top: 6px;
+  text-transform: uppercase; text-align: center;
+}
+
+/* ── Búsqueda ── */
+.ntv2-search-wrap {
+  display: flex; align-items: center;
+  background: rgba(19,19,31,0.75);
+  border: 1px solid var(--border);
+  border-radius: 6px; height: 48px;
+  padding: 0 18px; width: 100%;
+  position: relative;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.ntv2-search-wrap::before {
+  content: ''; position: absolute; left: 0; top: 0;
+  width: 3px; height: 100%;
+  background: var(--accent); border-radius: 6px 0 0 6px;
+}
+.ntv2-search-wrap:focus-within {
+  border-color: rgba(124,58,237,0.5);
+  box-shadow: 0 0 24px rgba(124,58,237,0.12);
+}
+.ntv2-search-engine {
+  font-size: 11px; color: var(--accent);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  font-weight: 600; flex-shrink: 0;
+}
+.ntv2-search-input {
+  flex: 1; background: none; border: none; outline: none;
+  color: white; font-size: 14px;
+  font-family: 'Segoe UI', sans-serif; margin-left: 10px;
+}
+.ntv2-search-input::placeholder { color: var(--muted); }
+
+/* ── Dials ── */
+.ntv2-dials-label {
+  font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.1em;
+  margin-bottom: 14px; text-align: center;
+}
+.ntv2-dials-row { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+.ntv2-dial {
+  display: flex; flex-direction: column;
+  align-items: center; gap: 10px;
+  cursor: pointer; transition: transform 0.2s; width: 100px;
+}
+.ntv2-dial:hover { transform: translateY(-6px); }
+.ntv2-dial-card {
+  width: 100px; height: 68px; border-radius: 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  overflow: hidden; position: relative;
+  transition: all 0.2s;
+  display: flex; align-items: center; justify-content: center;
+}
+.ntv2-dial:hover .ntv2-dial-card {
+  border-color: rgba(124,58,237,0.6);
+  box-shadow: 0 8px 28px rgba(124,58,237,0.2);
+}
+.ntv2-dial-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center top;
+  opacity: 0.35; transition: opacity 0.2s;
+}
+.ntv2-dial:hover .ntv2-dial-bg { opacity: 0.55; }
+.ntv2-dial img {
+  width: 32px; height: 32px; object-fit: contain;
+  border-radius: 8px; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+  position: relative; z-index: 1;
+}
+.ntv2-dial-emoji {
+  font-size: 28px; position: relative; z-index: 1;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6));
+}
+.ntv2-dial span {
+  font-size: 12px; color: var(--text);
+  max-width: 100px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; text-align: center;
+}
+.ntv2-dial-add .ntv2-dial-card {
+  background: transparent; border: 1px dashed rgba(124,58,237,0.4);
+  color: var(--muted); font-size: 28px;
+}
+.ntv2-dial-add:hover .ntv2-dial-card {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(124,58,237,0.05);
+}
+
+/* ── Perf ── */
+.ntv2-perf-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.ntv2-perf-item { display: flex; flex-direction: column; gap: 6px; }
+.ntv2-perf-label {
+  font-size: 10px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  display: flex; justify-content: space-between;
+}
+.ntv2-perf-label span { color: var(--text); font-weight: 500; }
+.ntv2-perf-bar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+.ntv2-perf-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width 0.6s; width: 0%; }
+.ntv2-perf-fill.warning { background: #f97316; }
+.ntv2-perf-fill.danger  { background: #ef4444; }
+
+/* ── Música ── */
+.ntv2-media-btn {
+  background: rgba(124,58,237,0.1); border: 1px solid var(--border);
+  color: var(--accent2); width: 28px; height: 28px;
+  border-radius: 6px; cursor: pointer; font-size: 13px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.ntv2-media-btn:hover { background: rgba(124,58,237,0.25); }
+.ntv2-media-btn.lg { width: 34px; height: 34px; font-size: 15px; }
+
+/* ── Widget inner ── */
+.wi { padding: 14px 16px 14px 18px; height: 100%; display: flex; flex-direction: column; }
+.wt { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; }
+
+/* ── Menú personalización ── */
+#customize-btn {
+  position: fixed; bottom: 20px; right: 20px;
+  z-index: 100; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 50%;
+  color: var(--muted); font-size: 16px;
+  width: 40px; height: 40px; cursor: pointer;
+  transition: all 0.2s; display: flex;
+  align-items: center; justify-content: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+#customize-btn:hover {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(124,58,237,0.1);
+  transform: rotate(15deg);
+}
+#customize-btn.edit-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(124,58,237,0.15);
+}
+#customize-panel {
+  position: fixed; bottom: 70px; right: 20px;
+  z-index: 200; width: 280px;
+  background: var(--surface);
+  border: 1px solid var(--border); border-radius: 16px;
+  overflow: hidden; display: none; flex-direction: column;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  transform: translateY(10px); opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  max-height: 80vh;
+}
+#customize-panel.open { display: flex; opacity: 1; transform: translateY(0); }
+#customize-panel-body {
+  overflow-y: auto; flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(124,58,237,0.4) transparent;
+}
+#customize-panel-body::-webkit-scrollbar { width: 4px; }
+#customize-panel-body::-webkit-scrollbar-thumb {
+  background: rgba(124,58,237,0.4); border-radius: 4px;
+}
+.cp-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px; font-weight: 600;
+  color: var(--text); letter-spacing: 0.05em;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.cp-close {
+  background: none; border: none; color: var(--muted);
+  font-size: 18px; cursor: pointer; padding: 0 4px;
+  transition: color 0.15s;
+}
+.cp-close:hover { color: var(--text); }
+.cp-section { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.cp-section:last-child { border-bottom: none; }
+.cp-section-title {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+  color: var(--muted); text-transform: uppercase; margin-bottom: 10px;
+}
+.cp-row {
+  display: flex; align-items: center;
+  justify-content: space-between; padding: 5px 0;
+  font-size: 13px; color: var(--text);
+}
+.cp-toggle {
+  width: 36px; height: 20px; border-radius: 10px;
+  background: var(--surface2); border: 1px solid var(--border);
+  cursor: pointer; position: relative; transition: background 0.2s;
+  flex-shrink: 0;
+}
+.cp-toggle::after {
+  content: ''; position: absolute;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--muted); top: 2px; left: 2px;
+  transition: transform 0.2s, background 0.2s;
+}
+.cp-toggle.on { background: rgba(124,58,237,0.3); border-color: var(--accent); }
+.cp-toggle.on::after { transform: translateX(16px); background: var(--accent); }
+.cp-btn {
+  padding: 4px 10px; border-radius: 6px; font-size: 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); cursor: pointer; transition: all 0.15s;
+}
+.cp-btn:hover { border-color: var(--accent); color: var(--accent); }
+.cp-edit-mode {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px; background: rgba(124,58,237,0.08);
+  border-top: 1px solid var(--border); font-size: 12px;
+}
+
+/* ── Panel añadir ── */
+#add-panel {
+  position: fixed; top: 60px; right: 128px; width: 240px;
+  background: rgba(13,13,20,0.96); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px; z-index: 200;
+  backdrop-filter: blur(12px); display: none; flex-direction: column; gap: 6px;
+}
+#add-panel.open { display: flex; }
+.panel-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 6px; }
+.add-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 10px;
+  border-radius: 8px; cursor: pointer; transition: background 0.15s; border: 1px solid transparent;
+}
+.add-item:hover { background: rgba(124,58,237,0.1); border-color: rgba(124,58,237,0.25); }
+.add-icon { font-size: 18px; flex-shrink: 0; }
+.add-name { font-size: 12px; color: var(--text); }
+.add-desc { font-size: 10px; color: var(--muted); }
+.add-check { font-size: 14px; color: var(--accent2); opacity: 0; transition: opacity 0.15s; margin-left: auto; }
+.add-item.active .add-check { opacity: 1; }
+
+/* ── Apps ── */
+#apps-btn {
+  position: fixed; top: 14px; right: 72px; z-index: 10;
+  width: 48px; height: 48px; border-radius: 50%;
+  background: rgba(13,13,20,0.7); backdrop-filter: blur(8px);
+  border: 2px solid rgba(124,58,237,0.35); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.2s, transform 0.2s;
+}
+#apps-btn:hover { border-color: rgba(124,58,237,0.8); transform: scale(1.05); }
+#apps-panel {
+  display: none; position: fixed; top: 70px; right: 72px;
+  z-index: 100; width: 200px;
+  background: rgba(10,10,20,0.96); backdrop-filter: blur(20px);
+  border: 1px solid rgba(124,58,237,0.35); border-radius: 12px;
+  padding: 12px; box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+.apps-label { font-size: 10px; color: rgba(255,255,255,0.35); margin-bottom: 10px; text-align: center; letter-spacing: 1px; }
+#apps-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.app-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+.app-item:hover { background: rgba(124,58,237,0.15); }
+.app-emoji { font-size: 22px; }
+.app-name { font-size: 9px; color: rgba(255,255,255,0.5); text-align: center; }
+
+/* ── Perfil ── */
+#perfil-badge { position: fixed; top: 14px; right: 16px; z-index: 10; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<img id="bg-image" src="" alt=""/>
+<canvas id="katakana-canvas"></canvas>
+<div id="grid-overlay"></div>
+<div id="canvas"></div>
+
+<button id="customize-btn" title="Personalizar">✏</button>
+
+<div id="customize-panel">
+  <div class="cp-header">
+    Personalizar
+    <button class="cp-close" id="cp-close">×</button>
+  </div>
+  <div id="customize-panel-body">
+
+    <!-- Fondo -->
+    <div class="cp-section">
+      <div class="cp-section-title">🖼 Fondo</div>
+      <div class="cp-row">
+        <span>Imagen de fondo</span>
+        <div style="display:flex;gap:6px">
+          <button class="cp-btn" id="cp-elegir-fondo">Elegir</button>
+          <button class="cp-btn" id="cp-quitar-fondo">Quitar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Widgets -->
+    <div class="cp-section">
+      <div class="cp-section-title">⚙ Widgets</div>
+      <div class="cp-row"><span>🕐 Reloj</span>
+        <button class="cp-toggle on" data-widget="reloj"></button></div>
+      <div class="cp-row"><span>🔍 Búsqueda</span>
+        <button class="cp-toggle on" data-widget="busqueda"></button></div>
+      <div class="cp-row"><span>⭐ Accesos directos</span>
+        <button class="cp-toggle on" data-widget="dials"></button></div>
+      <div class="cp-row"><span>⚡ Rendimiento</span>
+        <button class="cp-toggle on" data-widget="perf"></button></div>
+      <div class="cp-row"><span>▶ Reproductor</span>
+        <button class="cp-toggle on" data-widget="musica"></button></div>
+      <div class="cp-row"><span>🍅 Pomodoro</span>
+        <button class="cp-toggle on" data-widget="pomodoro"></button></div>
+      <div class="cp-row"><span>✅ Tareas</span>
+        <button class="cp-toggle on" data-widget="tareas"></button></div>
+    </div>
+
+    <!-- Edición -->
+    <div class="cp-section">
+      <div class="cp-section-title">✏ Disposición</div>
+      <div class="cp-row">
+        <span>Mover widgets</span>
+        <button class="cp-btn" id="cp-btn-editar">Editar</button>
+      </div>
+      <div class="cp-row">
+        <span></span>
+        <button class="cp-btn" id="cp-btn-reset">Resetear</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="apps-btn">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+    <circle cx="5"  cy="5"  r="2" fill="rgba(255,255,255,0.6)"/>
+    <circle cx="12" cy="5"  r="2" fill="rgba(255,255,255,0.6)"/>
+    <circle cx="19" cy="5"  r="2" fill="rgba(255,255,255,0.6)"/>
+    <circle cx="5"  cy="12" r="2" fill="rgba(255,255,255,0.6)"/>
+    <circle cx="12" cy="12" r="2" fill="rgba(255,255,255,0.6)"/>
+    <circle cx="19" cy="12" r="2" fill="rgba(255,255,255,0.6)"/>
+    <circle cx="5"  cy="19" r="2" fill="rgba(255,255,255,0.6)"/>
+    <circle cx="12" cy="19" r="2" fill="rgba(255,255,255,0.6)"/>
+    <circle cx="19" cy="19" r="2" fill="rgba(255,255,255,0.6)"/>
+  </svg>
+</div>
+<div id="apps-panel">
+  <div class="apps-label">APPS</div>
+  <div id="apps-grid"></div>
+</div>
+<div id="perfil-badge"></div>
+
+<script>
+// ════════════════════════════════
+//  CONFIG
+// ════════════════════════════════
+const CELL = 88, GAP = 10, PAD = 12;
+let COLS = 12, ROWS = 8;
+
+// ════════════════════════════════
+//  ESTADO
+// ════════════════════════════════
+let widgets  = [];
+let dragging = null;
+let nextId   = 1;
+
+// ════════════════════════════════
+//  KATAKANA
+// ════════════════════════════════
+(function() {
+  const canvas = document.getElementById('katakana-canvas');
+  const ctx    = canvas.getContext('2d');
+  const chars  = 'アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン';
+  let cols, drops;
+
+  function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    cols  = Math.floor(canvas.width / 18);
+    drops = Array(cols).fill(1);
+  }
+
+  function draw() {
+    ctx.fillStyle = 'rgba(13,13,20,0.04)';
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle = 'rgba(124,58,237,0.5)';
+    ctx.font = '14px monospace';
+    for (let i = 0; i < drops.length; i++) {
+      ctx.fillText(chars[Math.floor(Math.random()*chars.length)], i*18, drops[i]*18);
+      if (drops[i]*18 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    }
+  }
+
+  resize();
+  window.addEventListener('resize', resize);
+  setInterval(draw, 80);
+})();
+
+// ════════════════════════════════
+//  GRID HELPERS
+// ════════════════════════════════
+function recalcGrid() {
+  COLS = Math.floor((window.innerWidth  - PAD*2 + GAP) / (CELL+GAP));
+  ROWS = Math.floor((window.innerHeight - PAD*2 + GAP) / (CELL+GAP));
+}
+function gridOriginX() {
+  const totalW = COLS*(CELL+GAP) - GAP;
+  return Math.max(PAD, (window.innerWidth - totalW) / 2);
+}
+function gridOriginY() { return PAD; }
+function cellToPx(col,row) {
+  return { x: gridOriginX()+col*(CELL+GAP), y: gridOriginY()+row*(CELL+GAP) };
+}
+function pxToCell(px,py) {
+  const col = Math.round((px-gridOriginX())/(CELL+GAP));
+  const row = Math.round((py-gridOriginY())/(CELL+GAP));
+  return { col: Math.max(0,Math.min(col,COLS-1)), row: Math.max(0,Math.min(row,ROWS-1)) };
+}
+function widgetPx(w,h) {
+  return { width: w*(CELL+GAP)-GAP, height: h*(CELL+GAP)-GAP };
+}
+function posWidget(el,col,row,w,h) {
+  const {x,y}      = cellToPx(col,row);
+  const {width,height} = widgetPx(w,h);
+  el.style.left=x+'px'; el.style.top=y+'px';
+  el.style.width=width+'px'; el.style.height=height+'px';
+}
+
+// ════════════════════════════════
+//  GRID OVERLAY
+// ════════════════════════════════
+function buildGrid() {
+  recalcGrid();
+  const overlay = document.getElementById('grid-overlay');
+  overlay.innerHTML = '';
+  for (let r=0; r<ROWS; r++) {
+    for (let c=0; c<COLS; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'grid-cell';
+      const {x,y} = cellToPx(c,r);
+      const {width,height} = widgetPx(1,1);
+      cell.style.left=x+'px'; cell.style.top=y+'px';
+      cell.style.width=width+'px'; cell.style.height=height+'px';
+      cell.dataset.col=c; cell.dataset.row=r;
+      overlay.appendChild(cell);
+    }
+  }
+}
+function showGrid() {
+  const o = document.getElementById('grid-overlay');
+  requestAnimationFrame(() => o.classList.add('visible'));
+}
+function hideGrid() {
+  document.getElementById('grid-overlay').classList.remove('visible');
+}
+function highlightCells(col,row,w,h) {
+  document.querySelectorAll('.grid-cell').forEach(c => {
+    const cc=+c.dataset.col, cr=+c.dataset.row;
+    c.classList.toggle('highlight', cc>=col && cc<col+w && cr>=row && cr<row+h);
+  });
+}
+
+// ════════════════════════════════
+//  DRAG
+// ════════════════════════════════
+function initDrag(el, widget) {
+  el.addEventListener('mousedown', e => {
+    if (!document.body.classList.contains('edit-mode')) return;
+    if (e.button!==0 || e.target.closest('input,button,a,select,textarea')) return;
+    e.preventDefault();
+    dragging = widget;
+    el.classList.add('dragging');
+    showGrid();
+
+    let mx=e.clientX, my=e.clientY;
+    let ex=parseInt(el.style.left), ey=parseInt(el.style.top);
+    let col=widget.col, row=widget.row;
+
+    const move = e => {
+      const nx=ex+e.clientX-mx, ny=ey+e.clientY-my;
+      el.style.left=nx+'px'; el.style.top=ny+'px';
+      const s=pxToCell(nx,ny);
+      col=Math.min(s.col, COLS-widget.w);
+      row=Math.max(0, Math.min(s.row, ROWS-widget.h));
+      highlightCells(col,row,widget.w,widget.h);
+    };
+    const up = () => {
+      document.removeEventListener('mousemove',move);
+      document.removeEventListener('mouseup',up);
+      el.classList.remove('dragging');
+      hideGrid(); dragging=null;
+      widget.col=col; widget.row=row;
+      posWidget(el,col,row,widget.w,widget.h);
+      guardarLayout();
+    };
+    document.addEventListener('mousemove',move);
+    document.addEventListener('mouseup',up);
+  });
+}
+
+// ════════════════════════════════
+//  CATÁLOGO
+// ════════════════════════════════
+const CATALOG = [
+  { tipo:'reloj',    nombre:'Reloj',           desc:'Hora y fecha',          icon:'🕐', w:4, h:2, libre:true  },
+  { tipo:'busqueda', nombre:'Búsqueda',         desc:'Barra de búsqueda',     icon:'🔍', w:6, h:1, libre:true  },
+  { tipo:'dials',    nombre:'Accesos directos', desc:'Links favoritos',        icon:'⭐', w:6, h:2, libre:true  },
+  { tipo:'perf',     nombre:'Rendimiento',      desc:'CPU · RAM · DSK · NET', icon:'📊', w:3, h:2, libre:false },
+  { tipo:'musica',   nombre:'Música',           desc:'Reproductor',           icon:'🎵', w:3, h:2, libre:false },
+  { tipo:'pomodoro', nombre:'Pomodoro',         desc:'Temporizador',          icon:'🍅', w:2, h:3, libre:false },
+  { tipo:'tareas',   nombre:'Tareas',           desc:'Lista de tareas',       icon:'✅', w:3, h:3, libre:false },
+];
+
+// ════════════════════════════════
+//  RENDER WIDGETS
+// ════════════════════════════════
+function renderWidget(w) {
+  switch(w.tipo) {
+    case 'reloj':    return renderReloj();
+    case 'busqueda': return renderBusqueda();
+    case 'dials':    return renderDials(w);
+    case 'perf':     return renderPerf();
+    case 'musica':   return renderMusica();
+    case 'pomodoro': return renderPomodoro();
+    case 'tareas':   return renderTareas(w);
+    default: return '<div style="padding:16px;color:var(--muted)">Widget</div>';
+  }
+}
+
+function renderReloj() {
+  return `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:0">
+    <div id="ntv2-clock" class="ntv2-clock"></div>
+    <div id="ntv2-date"  class="ntv2-date"></div>
+  </div>`;
+}
+function renderBusqueda() {
+  return `<div style="height:100%;display:flex;align-items:center">
+    <div class="ntv2-search-wrap">
+      <span class="ntv2-search-engine" id="ntv2-engine-lbl">GOOGLE</span>
+      <input class="ntv2-search-input" id="ntv2-search" type="text" placeholder="Buscar o escribir una URL..."/>
+    </div>
+  </div>`;
+}
+function renderDials(w) {
+  return `<div style="height:100%;display:flex;flex-direction:column;justify-content:center">
+    <div class="ntv2-dials-label">ACCESOS DIRECTOS</div>
+    <div class="ntv2-dials-row" id="ntv2-dials-${w.id}"></div>
+  </div>`;
+}
+function renderPerf() {
+  return `<div class="wi">
+    <div class="wt">⚡ Rendimiento</div>
+    <div class="ntv2-perf-grid">
+      ${['cpu','ram','dsk','net'].map(k=>`
+        <div class="ntv2-perf-item">
+          <div class="ntv2-perf-label">${k.toUpperCase()} <span id="ntv2-${k}-v">--%</span></div>
+          <div class="ntv2-perf-bar"><div class="ntv2-perf-fill" id="ntv2-${k}-b"></div></div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+function renderMusica() {
+  return `<div class="wi" style="justify-content:space-between">
+    <div class="wt">▶ Reproducción</div>
+    <div style="display:flex;align-items:center;gap:10px;flex:1;padding:4px 0">
+      <img id="ntv2-art" src="" style="width:40px;height:40px;border-radius:6px;object-fit:cover;display:none"/>
+      <div id="ntv2-art-ph" style="width:40px;height:40px;border-radius:6px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:18px">🎵</div>
+      <div style="flex:1;overflow:hidden">
+        <div id="ntv2-title"  style="font-size:12px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Sin reproducción</div>
+        <div id="ntv2-artist" style="font-size:10px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px"></div>
+        <div id="ntv2-src"    style="font-size:10px;color:var(--accent2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:1px"></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+      <button class="ntv2-media-btn" onclick="window.chrome.webview.postMessage('musica:prev')">⏮</button>
+      <button class="ntv2-media-btn lg" id="ntv2-pp" onclick="window.chrome.webview.postMessage('musica:playpause')">▶</button>
+      <button class="ntv2-media-btn" onclick="window.chrome.webview.postMessage('musica:next')">⏭</button>
+    </div>
+  </div>`;
+}
+function renderPomodoro() {
+  return `<div class="wi" style="align-items:center;justify-content:center;gap:10px">
+    <div class="wt" style="padding-left:0">🍅 Pomodoro</div>
+    <div id="ntv2-pom-t" style="font-size:36px;font-weight:200;color:white;letter-spacing:-1px">25:00</div>
+    <div id="ntv2-pom-l" style="font-size:10px;color:var(--accent2);letter-spacing:0.1em">ENFOQUE</div>
+    <div style="display:flex;gap:8px">
+      <button class="ntv2-media-btn" id="ntv2-pom-btn">▶</button>
+      <button class="ntv2-media-btn" id="ntv2-pom-rst">↺</button>
+    </div>
+  </div>`;
+}
+function renderTareas(w) {
+  return `<div class="wi">
+    <div class="wt">✅ Tareas</div>
+    <div id="ntv2-tk-${w.id}" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px;margin-bottom:8px"></div>
+    <div style="display:flex;gap:6px">
+      <input id="ntv2-tki-${w.id}" type="text" placeholder="Nueva tarea..."
+        style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:6px 10px;color:var(--text);font-size:11px;font-family:'Segoe UI',sans-serif;outline:none"/>
+      <button class="ntv2-media-btn" data-ta="${w.id}">+</button>
+    </div>
+  </div>`;
+}
+
+// ════════════════════════════════
+//  CREAR WIDGET
+// ════════════════════════════════
+function crearWidgetEl(widget) {
+  const def = CATALOG.find(c=>c.tipo===widget.tipo);
+  const el  = document.createElement('div');
+  el.className = 'widget' + (def?.libre ? ' widget-libre' : '');
+  el.id = 'w-'+widget.id;
+  el.innerHTML = renderWidget(widget);
+  posWidget(el, widget.col, widget.row, widget.w, widget.h);
+  initDrag(el, widget);
+  document.getElementById('canvas').appendChild(el);
+  postInit(widget);
+  return el;
+}
+
+function postInit(w) {
+  switch(w.tipo) {
+    case 'reloj':    iniciarReloj();         break;
+    case 'busqueda': iniciarBusqueda();      break;
+    case 'perf':     window.chrome?.webview?.postMessage('get:perf'); break;
+    case 'pomodoro': iniciarPomodoro();      break;
+    case 'tareas':   iniciarTareas(w.id);   break;
+    case 'dials':    window.chrome?.webview?.postMessage('get:dials'); break;
+  }
+}
+
+// ════════════════════════════════
+//  AÑADIR / QUITAR
+// ════════════════════════════════
+function agregarWidget(tipo, col, row) {
+  const def = CATALOG.find(c=>c.tipo===tipo);
+  if (!def) return;
+  // Posición por defecto: buscar fila libre
+  if (col === undefined) {
+    const maxRow = widgets.length ? Math.max(...widgets.map(w=>w.row+w.h)) : 0;
+    col = 0; row = maxRow;
+  }
+  const widget = { id:nextId++, tipo, col, row, w:def.w, h:def.h, config:{} };
+  widgets.push(widget);
+  crearWidgetEl(widget);
+  guardarLayout();
+  actualizarPanel();
+}
+
+function quitarWidget(id) {
+  widgets = widgets.filter(w=>w.id!==id);
+  document.getElementById('w-'+id)?.remove();
+  guardarLayout();
+  actualizarPanel();
+}
+
+// ════════════════════════════════
+//  LAYOUT — usa v2:posiciones
+// ════════════════════════════════
+function guardarLayout() {
+  const data = widgets.map(w=>({ id:w.id, tipo:w.tipo, col:w.col, row:w.row, w:w.w, h:w.h, config:w.config??{} }));
+  window.chrome?.webview?.postMessage('v2:posiciones:' + JSON.stringify(data));
+}
+
+function cargarLayout(saved) {
+  widgets.forEach(w => document.getElementById('w-'+w.id)?.remove());
+  widgets = [];
+  if (saved && saved.length) {
+    for (const w of saved) {
+      if (nextId <= w.id) nextId = w.id+1;
+      widgets.push(w);
+      crearWidgetEl(w);
+    }
+    actualizarPanel();
+  } else {
+    layoutDefault();
+  }
+}
+
+function layoutDefault() {
+  agregarWidget('reloj',    0, 0);
+  agregarWidget('busqueda', 0, 3);
+  agregarWidget('dials',    0, 4);
+  agregarWidget('perf',     7, 4);
+  agregarWidget('musica',   10, 4);
+}
+
+function postInit(w) {
+  setTimeout(() => {
+    switch(w.tipo) {
+      case 'reloj':    iniciarReloj();       break;
+      case 'busqueda': iniciarBusqueda();    break;
+      case 'pomodoro': iniciarPomodoro();    break;
+      case 'tareas':   iniciarTareas(w.id); break;
+      case 'dials':    window.chrome?.webview?.postMessage('get:dials'); break;
+    }
+  }, 0);
+}
+
+// ════════════════════════════════
+//  PANEL AÑADIR
+// ════════════════════════════════
+function buildPanel() {
+  actualizarPanel();
+}
+
+function actualizarPanel() {
+  document.querySelectorAll('.cp-toggle').forEach(btn => {
+    const tipo = btn.dataset.widget;
+    btn.classList.toggle('on', !!widgets.find(w => w.tipo === tipo));
+  });
+}
+
+// ════════════════════════════════
+//  APPS
+// ════════════════════════════════
+const APPS = [
+  { nombre:'Capturas',  emoji:'📸', msg:'navigate:capturas'  },
+  { nombre:'Historial', emoji:'🕐', msg:'navigate:historial' },
+  { nombre:'Descargas', emoji:'📥', msg:'navigate:descargas' },
+  { nombre:'Favoritos', emoji:'⭐', msg:'navigate:favoritos' },
+  { nombre:'Ajustes',   emoji:'⚙️', msg:'navigate:ajustes'   },
+  { nombre:'Notas',     emoji:'📝', msg:'navigate:notas'     },
+];
+const appsGrid  = document.getElementById('apps-grid');
+const appsPanel = document.getElementById('apps-panel');
+const appsBtn   = document.getElementById('apps-btn');
+APPS.forEach(app => {
+  const el = document.createElement('div');
+  el.className='app-item';
+  el.innerHTML=`<span class="app-emoji">${app.emoji}</span><span class="app-name">${app.nombre}</span>`;
+  el.onclick = () => { appsPanel.style.display='none'; window.chrome.webview.postMessage(app.msg); };
+  appsGrid.appendChild(el);
+});
+appsBtn.onclick = e => {
+  e.stopPropagation();
+  appsPanel.style.display = appsPanel.style.display==='block' ? 'none' : 'block';
+};
+document.addEventListener('click', e => {
+  if (!appsPanel.contains(e.target) && e.target!==appsBtn) appsPanel.style.display='none';
+});
+
+// ════════════════════════════════
+//  LÓGICA WIDGETS
+// ════════════════════════════════
+
+// Reloj
+function iniciarReloj() {
+  const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  function tick() {
+    const n=new Date();
+    const h=String(n.getHours()).padStart(2,'0');
+    const m=String(n.getMinutes()).padStart(2,'0');
+    const s=String(n.getSeconds()).padStart(2,'0');
+    const clk=document.getElementById('ntv2-clock');
+    const dat=document.getElementById('ntv2-date');
+    if(clk) clk.innerHTML=`${h}<span class="acc">:</span>${m}<span class="sec"> ${s}</span>`;
+    if(dat) dat.textContent=`${dias[n.getDay()]} · ${n.getDate()} de ${meses[n.getMonth()]}`;
+  }
+  tick(); setInterval(tick,1000);
+}
+
+// Búsqueda
+function iniciarBusqueda() {
+  const input=document.getElementById('ntv2-search');
+  if(!input) return;
+  input.addEventListener('keydown', e => {
+    if(e.key!=='Enter') return;
+    const q=input.value.trim(); if(!q) return;
+    const isUrl=/^https?:\/\//.test(q)||/^[\w-]+\.\w{2,}/.test(q);
+    window.chrome.webview.postMessage('navigate:'+(isUrl?q:`https://www.google.com/search?q=${encodeURIComponent(q)}`));
+    input.value='';
+  });
+  setTimeout(()=>input.focus(),100);
+}
+
+// Perf
+function actualizarPerf(data) {
+  const set=(k,val,lbl)=>{
+    const b=document.getElementById('ntv2-'+k+'-b');
+    const v=document.getElementById('ntv2-'+k+'-v');
+    if(b){ b.style.width=Math.min(val,100)+'%'; b.className='ntv2-perf-fill'+(val>90?' danger':val>70?' warning':''); }
+    if(v) v.textContent=lbl;
+  };
+  set('cpu',data.cpu??0,(data.cpu??'--')+'%');
+  set('ram',data.ram??0,(data.ram??'--')+'%');
+  set('dsk',data.dsk??0,(data.dsk??'--')+'%');
+  set('net',Math.min((data.netKb??0)/100,100),(data.netKb??'--')+' KB/s');
+}
+
+// Música
+function actualizarMusica(data) {
+  const el=(id)=>document.getElementById(id);
+  if(el('ntv2-title'))  el('ntv2-title').textContent  = data.titulo  || 'Sin reproducción';
+  if(el('ntv2-artist')) el('ntv2-artist').textContent = data.artista || '';
+  if(el('ntv2-src'))    el('ntv2-src').textContent    = data.fuente  || '';
+  if(el('ntv2-pp')) el('ntv2-pp').textContent = data.playing ? '⏸' : '▶';
+  const art=el('ntv2-art'), ph=el('ntv2-art-ph');
+  if(art&&ph){
+    if(data.imagen){ art.src=data.imagen; art.style.display='block'; ph.style.display='none'; }
+    else { art.style.display='none'; ph.style.display='flex'; }
+  }
+}
+
+// Pomodoro
+let _pomTimer=null,_pomSecs=25*60,_pomActivo=false,_pomModo='enfoque';
+function iniciarPomodoro() {
+  const btn=document.getElementById('ntv2-pom-btn');
+  const rst=document.getElementById('ntv2-pom-rst');
+  if(!btn) return;
+  btn.onclick=()=>{
+    _pomActivo=!_pomActivo; btn.textContent=_pomActivo?'⏸':'▶';
+    _pomActivo?(_pomTimer=setInterval(tickPom,1000)):clearInterval(_pomTimer);
+  };
+  rst?.addEventListener('click',()=>{
+    clearInterval(_pomTimer);_pomActivo=false;_pomModo='enfoque';_pomSecs=25*60;
+    btn.textContent='▶'; updatePom();
+  });
+}
+function tickPom(){
+  if(_pomSecs<=0){
+    clearInterval(_pomTimer);_pomActivo=false;
+    _pomModo=_pomModo==='enfoque'?'descanso':'enfoque';
+    _pomSecs=_pomModo==='enfoque'?25*60:5*60;
+    document.getElementById('ntv2-pom-btn').textContent='▶';
+  } else _pomSecs--;
+  updatePom();
+}
+function updatePom(){
+  const t=document.getElementById('ntv2-pom-t');
+  const l=document.getElementById('ntv2-pom-l');
+  if(t) t.textContent=`${String(Math.floor(_pomSecs/60)).padStart(2,'0')}:${String(_pomSecs%60).padStart(2,'0')}`;
+  if(l) l.textContent=_pomModo==='enfoque'?'ENFOQUE':'DESCANSO';
+}
+
+// Tareas
+let _tareas={};
+function iniciarTareas(wid){
+  _tareas[wid]=[];
+  renderTk(wid);
+  const input=document.getElementById(`ntv2-tki-${wid}`);
+  const btn=document.querySelector(`[data-ta="${wid}"]`);
+  const add=()=>{
+    const txt=input?.value.trim(); if(!txt) return;
+    _tareas[wid].push({id:Date.now(),texto:txt,done:false});
+    renderTk(wid); if(input) input.value='';
+  };
+  btn?.addEventListener('click',add);
+  input?.addEventListener('keydown',e=>{ if(e.key==='Enter') add(); });
+}
+function renderTk(wid){
+  const c=document.getElementById(`ntv2-tk-${wid}`); if(!c) return;
+  c.innerHTML='';
+  for(const t of (_tareas[wid]||[])){
+    const item=document.createElement('div');
+    item.style.cssText='display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:6px;cursor:pointer;transition:background 0.15s';
+    item.innerHTML=`
+      <div style="width:14px;height:14px;border-radius:3px;border:1px solid ${t.done?'var(--accent)':'var(--border)'};background:${t.done?'var(--accent)':'transparent'};flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:white;transition:all 0.15s">${t.done?'✓':''}</div>
+      <span style="flex:1;font-size:11px;color:${t.done?'var(--muted)':'var(--text)'};text-decoration:${t.done?'line-through':'none'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.texto}</span>
+      <button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:11px;opacity:0;transition:opacity 0.15s;padding:0 2px" data-del="${t.id}">✕</button>`;
+    item.addEventListener('mouseenter',()=>item.querySelector('[data-del]').style.opacity='0.5');
+    item.addEventListener('mouseleave',()=>item.querySelector('[data-del]').style.opacity='0');
+    item.querySelector('div').onclick=()=>{ t.done=!t.done; renderTk(wid); };
+    item.querySelector('[data-del]').onclick=e=>{
+      e.stopPropagation(); _tareas[wid]=_tareas[wid].filter(x=>x.id!==t.id); renderTk(wid);
+    };
+    c.appendChild(item);
+  }
+}
+
+// Dials
+function renderDials(wid, dials){
+  const c=document.getElementById(`ntv2-dials-${wid}`); if(!c) return;
+  c.innerHTML='';
+  for(const d of dials){
+    const el=document.createElement('div'); el.className='ntv2-dial';
+    const bgStyle=d.preview?`background-image:url('${d.preview}')`:'';
+    const iconHtml=d.favicon
+      ?`<img src="${d.favicon}"/>`
+      :`<span class="ntv2-dial-emoji">${d.emoji??'🌐'}</span>`;
+    el.innerHTML=`
+      <div class="ntv2-dial-card">
+        <div class="ntv2-dial-bg" style="${bgStyle}"></div>
+        ${iconHtml}
+      </div>
+      <span>${d.nombre}</span>`;
+    el.addEventListener('mouseenter',()=>el.style.transform='translateY(-6px)');
+    el.addEventListener('mouseleave',()=>el.style.transform='');
+    el.addEventListener('click',()=>window.chrome.webview.postMessage('navigate:'+d.url));
+    c.appendChild(el);
+  }
+  // Añadir
+  const add=document.createElement('div'); add.className='ntv2-dial ntv2-dial-add';
+  add.innerHTML=`<div class="ntv2-dial-card">+</div><span>Añadir</span>`;
+  add.onclick=()=>window.chrome.webview.postMessage('dial:nuevo');
+  add.addEventListener('mouseenter',()=>add.style.transform='translateY(-6px)');
+  add.addEventListener('mouseleave',()=>add.style.transform='');
+  c.appendChild(add);
+}
+
+// ════════════════════════════════
+//  TEMA
+// ════════════════════════════════
+function aplicarTema(t){
+  const r=document.documentElement;
+  const hex=t.Accent??t.accent??'#7c3aed';
+  r.style.setProperty('--accent',hex);
+  r.style.setProperty('--bg',t.Bg??t.bg??'#0d0d14');
+  r.style.setProperty('--surface',t.Surface??t.surface??'#13131f');
+  r.style.setProperty('--surface2',t.Surface2??t.surface2??'#1a1a2e');
+  const hx=hex.replace('#','');
+  r.style.setProperty('--border',`rgba(${parseInt(hx.slice(0,2),16)},${parseInt(hx.slice(2,4),16)},${parseInt(hx.slice(4,6),16)},0.2)`);
+  r.style.setProperty('--accent2',hex);
+}
+
+// ════════════════════════════════
+//  MENSAJES C#
+// ════════════════════════════════
+window.chrome?.webview?.addEventListener('message', e => {
+  const raw=e.data; if(typeof raw!=='string') return;
+
+  if(raw.startsWith('tema:'))       { aplicarTema(JSON.parse(raw.slice(5))); return; }
+  if(raw.startsWith('perf:'))       { try{ actualizarPerf(JSON.parse(raw.slice(5))); }catch{} return; }
+  if(raw.startsWith('musica:') && !raw.startsWith('musica:prev') && !raw.startsWith('musica:next') && !raw.startsWith('musica:playpause')){
+    try{
+      actualizarMusica(JSON.parse(raw.slice(7)));
+    }catch{} return;
+  }
+  if(raw.startsWith('dials:'))      {
+    try{
+      const dials=JSON.parse(raw.slice(6));
+      widgets.filter(w=>w.tipo==='dials').forEach(w=>renderDials(w.id,dials));
+    }catch{} return;
+  }
+  if(raw.startsWith('v2:posiciones:')){
+    try{
+      const saved=JSON.parse(raw.slice(14));
+      if(Array.isArray(saved) && saved.length > 0)
+        cargarLayout(saved);
+      else
+        layoutDefault();
+    }catch{ layoutDefault(); } return;
+  }
+  if(raw.startsWith('fondo:')){
+    const src=raw.slice(6).trim();
+    const img=document.getElementById('bg-image');
+    if(src){ img.src='file:///'+src; document.body.classList.add('has-bg'); }
+    else { img.src=''; document.body.classList.remove('has-bg'); }
+    return;
+  }
+  if(raw.startsWith('perfil:')){
+    try{
+      const p=JSON.parse(raw.slice(7));
+      const badge=document.getElementById('perfil-badge');
+      if(badge) badge.innerHTML=p.Avatar
+        ?`<img src="${p.Avatar}" style="width:48px;height:48px;border-radius:50%;border:2px solid rgba(124,58,237,0.5);object-fit:cover"/>`
+        :`<div style="width:48px;height:48px;border-radius:50%;background:rgba(124,58,237,0.2);border:2px solid rgba(124,58,237,0.4);display:flex;align-items:center;justify-content:center;font-size:20px">👤</div>`;
+    }catch{} return;
+  }
+  if(raw.startsWith('rendimiento:')) {
+    try {
+      const parts = raw.slice(12).split(',');
+      actualizarPerf({
+        cpu: parseFloat(parts[0]),
+        ram: parseFloat(parts[1]),
+        dsk: parseFloat(parts[2]),
+        netKb: parseFloat(parts[3])
+      });
+    } catch {} return;
+  }
+});
+
+// ════════════════════════════════
+//  RESIZE
+// ════════════════════════════════
+window.addEventListener('resize', () => {
+  buildGrid();
+  // Reposicionar todos los widgets
+  widgets.forEach(w => {
+    const el=document.getElementById('w-'+w.id);
+    if(el) posWidget(el,w.col,w.row,w.w,w.h);
+  });
+});
+
+// ════════════════════════════════
+//  INIT
+// ════════════════════════════════
+function init(){
+  buildGrid();
+  buildPanel();
+  window.chrome?.webview?.postMessage('get:tema');
+  window.chrome?.webview?.postMessage('get:fondo');
+  window.chrome?.webview?.postMessage('get:dials');
+  window.chrome?.webview?.postMessage('get:v2:posiciones');
+  if(!window.chrome?.webview) layoutDefault(); // solo para pruebas fuera del navegador
+}
+
+init();
+
+// ── Menú personalización ────────────────────────────────
+const customizeBtn   = document.getElementById('customize-btn');
+const customizePanel = document.getElementById('customize-panel');
+
+customizeBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  customizePanel.classList.toggle('open');
+});
+document.getElementById('cp-close').addEventListener('click', () =>
+  customizePanel.classList.remove('open'));
+document.addEventListener('click', e => {
+  if (!e.target.closest('#customize-panel') && !e.target.closest('#customize-btn'))
+    customizePanel.classList.remove('open');
+});
+
+// Fondo
+document.getElementById('cp-elegir-fondo').addEventListener('click', () =>
+  window.chrome?.webview?.postMessage('fondo:elegir'));
+document.getElementById('cp-quitar-fondo').addEventListener('click', () => {
+  document.getElementById('bg-image').src = '';
+  document.body.classList.remove('has-bg');
+  window.chrome?.webview?.postMessage('fondo:quitar');
+});
+
+// Toggles widgets
+document.querySelectorAll('.cp-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tipo = btn.dataset.widget;
+    const ya   = widgets.find(w => w.tipo === tipo);
+    if (ya) {
+      quitarWidget(ya.id);
+      btn.classList.remove('on');
+    } else {
+      agregarWidget(tipo);
+      btn.classList.add('on');
+    }
+  });
+});
+
+// Modo edición
+const cpBtnEditar = document.getElementById('cp-btn-editar');
+cpBtnEditar.addEventListener('click', () => {
+  const editando = document.body.classList.toggle('edit-mode');
+  cpBtnEditar.textContent = editando ? 'Listo' : 'Editar';
+  customizePanel.classList.remove('open');
+  if (!editando) guardarLayout();
+});
+
+// Reset layout
+document.getElementById('cp-btn-reset').addEventListener('click', () => {
+  widgets.forEach(w => document.getElementById('w-'+w.id)?.remove());
+  widgets = [];
+  layoutDefault();
+  guardarLayout();
+  // Sincronizar toggles
+  document.querySelectorAll('.cp-toggle').forEach(b => {
+    b.classList.toggle('on', !!widgets.find(w => w.tipo === b.dataset.widget));
+  });
+});
+</script>
+</body>
+</html>

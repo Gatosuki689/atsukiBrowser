@@ -19,6 +19,9 @@
     <Content Include="Resources\NuevaTab.html">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="Resources\NuevaTabV2.html">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="Resources\Historial.html">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
@@ -49,6 +52,18 @@
     <Content Include="Resources\AtsukiNotes.html">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="Resources\AtsukiWallpapers.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\Ayuda.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\AtsukiDraw.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\AtsukiPalette.html">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <PackageReference Include="System.Management" Version="10.0.8" />
     <PackageReference Include="TagLibSharp" Version="2.3.0" />
     <Resource Include="icon.ico" />
@@ -56,6 +71,14 @@
   <ItemGroup>
     <Content Include="version.txt">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Resources\yt-dlp.exe">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Resources\ffmpeg.exe">
+    <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
 </Project>

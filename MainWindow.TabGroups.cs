@@ -5,6 +5,8 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Input;
+using System.IO;
+using System.Text.Json;
 
 namespace atsukibrowser
 {
@@ -192,7 +194,7 @@ namespace atsukibrowser
                     Nombre     = string.IsNullOrWhiteSpace(txtNombre.Text)
                                     ? "Grupo " + _nextGroupId : txtNombre.Text.Trim(),
                     Color      = colorSeleccionado,
-                    TabIndices = new List<int> { tabIdx }
+                    TabIndices = tabIdx >= 0 ? new List<int> { tabIdx } : new List<int>()
                 };
                 _tabGroups.Add(grupo);
                 _colorGrupoIdx++;
@@ -267,11 +269,10 @@ namespace atsukibrowser
                 grupo.TabIndices = grupo.TabIndices
                     .Select(i => i > tabCerrada ? i - 1 : i)
                     .ToList();
-                // NO eliminar el grupo aunque quede vacío
-                // Se elimina solo cuando el usuario lo pide explícitamente
+                // NO eliminar el grupo aunque quede vacío —
+                // se elimina solo cuando el usuario lo pide explícitamente
             }
-            // Limpiar grupos vacíos solo si no tienen nombre personalizado
-            // (opcional — por ahora no eliminar automáticamente)
+            RenderizarBotonesGrupo();
         }
 
         // ── Renderizar barra de grupos ────────────────────────────────────────
@@ -279,13 +280,17 @@ namespace atsukibrowser
         {
             GruposStrip.Children.Clear();
 
-            if (_tabGroups.Count == 0)
+            // Si el usuario no quiere ver la barra, ocultarla siempre
+            if (!_mostrarBarraGrupos)
             {
                 GruposBar.Visibility = Visibility.Collapsed;
                 return;
             }
 
+            // Si quiere verla pero no hay grupos, mostrarla vacía igual
             GruposBar.Visibility = Visibility.Visible;
+
+            if (_tabGroups.Count == 0) return; // barra visible pero vacía
 
             foreach (var grupo in _tabGroups)
             {
@@ -411,16 +416,13 @@ namespace atsukibrowser
 
                 ctx.Items.Add(new Separator { Background = new SolidColorBrush(Color.FromRgb(42, 26, 78)) });
 
-                ctx.Items.Add(CrearOpcion("✕  Cerrar tabs del grupo",
+                ctx.Items.Add(CrearOpcion("✕  Quitar tabs del grupo",
                     Color.FromRgb(239, 68, 68), () =>
                 {
-                    var indices = g.TabIndices.OrderByDescending(i => i).ToList();
-                    // Desconectar del grupo ANTES de cerrar para que ReindexarGrupos no lo elimine prematuramente
+                    // Solo limpiar los índices — las tabs siguen abiertas
                     g.TabIndices.Clear();
-                    _tabGroups.Remove(g);
-                    foreach (int idx in indices)
-                        if (idx >= 0 && idx < _tabs.Count)
-                            CerrarTab(idx);
+                    // Quitar el indicador de color de cada tab
+                    ActualizarEstiloTabs();
                     RenderizarBotonesGrupo();
                 }));
 
@@ -444,6 +446,91 @@ namespace atsukibrowser
 
                 GruposStrip.Children.Add(btnGrupo);
             }
+        }
+
+        private void GuardarGrupos()
+        {
+            try
+            {
+                string path = Path.Combine(_carpetaPerfil, "tab_groups.json");
+                var data = new
+                {
+                    mostrarBarra = _mostrarBarraGrupos,
+                    grupos = _tabGroups.Select(g => new
+                    {
+                        id        = g.Id,
+                        nombre    = g.Nombre,
+                        color     = $"{g.Color.R},{g.Color.G},{g.Color.B}",
+                        colapsado = g.Colapsado,
+                        urls      = g.TabIndices
+                                    .Where(i => i >= 0 && i < _tabs.Count)
+                                    .Select(i => _tabs[i].Source?.ToString() ?? "")
+                                    .Where(u => !string.IsNullOrEmpty(u))
+                                    .ToList()
+                    })
+                };
+                File.WriteAllText(path, JsonSerializer.Serialize(data));
+            }
+            catch { }
+        }
+
+        private void CargarGrupos()
+        {
+            try
+            {
+                string path = Path.Combine(_carpetaPerfil, "tab_groups.json");
+                if (!File.Exists(path)) return;
+
+                _tabGroups.Clear();
+                _nextGroupId = 1;
+
+                var doc = JsonDocument.Parse(File.ReadAllText(path)).RootElement;
+
+                if (doc.TryGetProperty("mostrarBarra", out var mb))
+                    _mostrarBarraGrupos = mb.GetBoolean();
+
+                if (doc.TryGetProperty("grupos", out var grupos))
+                {
+                    foreach (var g in grupos.EnumerateArray())
+                    {
+                        string colorStr = g.TryGetProperty("color", out var c) ? c.GetString() ?? "124,58,237" : "124,58,237";
+                        string[] rgb = colorStr.Split(',');
+                        byte cr = byte.Parse(rgb[0].Trim());
+                        byte cg = byte.Parse(rgb[1].Trim());
+                        byte cb = byte.Parse(rgb[2].Trim());
+
+                        var urlsGuardadas = new List<string>();
+                        if (g.TryGetProperty("urls", out var us))
+                            foreach (var u in us.EnumerateArray())
+                                urlsGuardadas.Add(u.GetString() ?? "");
+
+                        var grupo = new TabGroup
+                        {
+                            Id         = g.TryGetProperty("id",     out var id)  ? id.GetInt32()    : _nextGroupId,
+                            Nombre     = g.TryGetProperty("nombre", out var nom) ? nom.GetString()! : "Grupo",
+                            Color      = Color.FromRgb(cr, cg, cb),
+                            Colapsado  = g.TryGetProperty("colapsado", out var col) && col.GetBoolean(),
+                            TabIndices = new List<int>()
+                        };
+
+                        // Asociar tabs ya existentes por URL
+                        for (int i = 0; i < _tabs.Count; i++)
+                        {
+                            string tabUrl = _tabs[i].Source?.ToString() ?? "";
+                            if (urlsGuardadas.Contains(tabUrl))
+                                grupo.TabIndices.Add(i);
+                        }
+
+                        _tabGroups.Add(grupo);
+                        _nextGroupId = Math.Max(_nextGroupId, grupo.Id + 1);
+                    }
+                }
+
+                GruposBar.Visibility = _mostrarBarraGrupos ? Visibility.Visible : Visibility.Collapsed;
+                RenderizarBotonesGrupo();
+                ActualizarEstiloTabs();
+            }
+            catch { }
         }
     }
 }

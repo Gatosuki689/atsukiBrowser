@@ -396,6 +396,7 @@ input[type="range"] {
     <a class="sb-item" href="#" onclick="mostrarSeccion('actualizaciones'); return false;">
       <span class="sb-icon">🔄</span><span class="sb-label">Actualizaciones</span>
     </a>
+    <div class="sb-item" onclick="navigate('ayuda')">❓ Ayuda</div>
   </div>
 
   <div id="sidebar-footer">
@@ -410,6 +411,46 @@ input[type="range"] {
     <div id="header">
       <h2>Ajustes — <span>Apariencia</span></h2>
       <p>Personaliza la apariencia del navegador</p>
+    </div>
+    <div class="section">
+    <!-- Opciones de UI -->
+      <div class="section-title" style="margin-top:24px">Interfaz</div>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Animaciones</div>
+            <div class="perf-desc">Desactiva transiciones y efectos de movimiento</div>
+          </div>
+          <button class="sb-widget-toggle on" id="toggle-animaciones"></button>
+        </div>
+
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Nueva pestaña V2</div>
+            <div class="perf-desc">Layout libre con widgets arrastrables y posición personalizada</div>
+          </div>
+          <button class="sb-widget-toggle" id="toggle-nuevatab-v2"></button>
+        </div>
+
+        <div class="perf-row">
+          <div>
+            <div class="perf-label">Densidad de la UI</div>
+            <div class="perf-desc">Compacto ocupa menos espacio vertical</div>
+          </div>
+          <select id="sel-densidad" style="
+            background:var(--surface2); border:1px solid var(--border);
+            border-radius:6px; padding:5px 10px; color:var(--text);
+            font-size:12px; cursor:pointer; outline:none;
+            font-family:var(--font);
+          ">
+            <option value="normal">Normal</option>
+            <option value="compacto">Compacto</option>
+            <option value="espacioso">Espacioso</option>
+          </select>
+        </div>
+
+      </div>
     </div>
 
     <div class="section">
@@ -486,36 +527,6 @@ input[type="range"] {
           ">AtsukiBrowser — The quick brown fox</div>
         </div>
         <button class="btn-aplicar" onclick="aplicarCustom()">Aplicar tema personalizado</button>
-      </div>
-      <!-- Opciones de UI -->
-      <div class="section-title" style="margin-top:24px">Interfaz</div>
-      <div style="display:flex; flex-direction:column; gap:10px;">
-
-        <div class="perf-row">
-          <div>
-            <div class="perf-label">Animaciones</div>
-            <div class="perf-desc">Desactiva transiciones y efectos de movimiento</div>
-          </div>
-          <button class="sb-widget-toggle on" id="toggle-animaciones"></button>
-        </div>
-
-        <div class="perf-row">
-          <div>
-            <div class="perf-label">Densidad de la UI</div>
-            <div class="perf-desc">Compacto ocupa menos espacio vertical</div>
-          </div>
-          <select id="sel-densidad" style="
-            background:var(--surface2); border:1px solid var(--border);
-            border-radius:6px; padding:5px 10px; color:var(--text);
-            font-size:12px; cursor:pointer; outline:none;
-            font-family:var(--font);
-          ">
-            <option value="normal">Normal</option>
-            <option value="compacto">Compacto</option>
-            <option value="espacioso">Espacioso</option>
-          </select>
-        </div>
-
       </div>
       <div id="preview-wrap">
         <div id="preview-label">Vista previa</div>
@@ -1425,7 +1436,7 @@ input[type="range"] {
   window.chrome.webview.postMessage('get:sidebar');
 
   // ── Widgets sidebar ────────────────────────────────
-  document.querySelectorAll('.sb-widget-toggle').forEach(btn => {
+  document.querySelectorAll('.sb-widget-toggle[data-sbwidget]').forEach(btn => {
     btn.addEventListener('click', () => {
       btn.classList.toggle('on');
       const widget = btn.dataset.sbwidget;
@@ -1676,6 +1687,13 @@ input[type="range"] {
   });
   document.getElementById('btn-importar-datos').addEventListener('click', () => {
     window.chrome.webview.postMessage('importar:datos');
+  });
+
+  document.getElementById('toggle-nuevatab-v2')?.addEventListener('click', function() {
+    this.classList.toggle('on');
+    const activo = this.classList.contains('on');
+    window._nuevatabLayout = activo ? 'v2' : 'v1';
+    window.chrome.webview.postMessage('nuevatab:layout:' + window._nuevatabLayout);
   });
 
   window.chrome.webview.addEventListener('message', e => {
@@ -2009,6 +2027,19 @@ input[type="range"] {
       perfConfig.intervalo_cache = parseInt(sliderCache.value);
       window.chrome.webview.postMessage('perf:config:' + JSON.stringify(perfConfig));
   });
+
+  window.chrome.webview.addEventListener('message', e => {
+    const raw = e.data;
+    if (typeof raw !== 'string') return;
+    if (raw.startsWith('nuevatab:layout:')) {
+      const v = raw.slice('nuevatab:layout:'.length).trim();
+      window._nuevatabLayout = v; // guardar estado
+      document.getElementById('toggle-nuevatab-v2')
+        ?.classList.toggle('on', v === 'v2');
+    }
+  });
+
+  window.chrome.webview.postMessage('get:nuevatab:layout')
 </script>
 </body>
 </html>

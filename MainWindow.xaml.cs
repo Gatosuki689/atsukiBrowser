@@ -20,6 +20,10 @@ namespace atsukibrowser
 {
     public partial class MainWindow : Window
     {
+
+        private bool _mostrarBarraGrupos = false;
+        private WebView2? _tabPreCalentada = null;
+        private bool _extensionesChromeCargadas = false;
         private List<TabGroup> _tabGroups = new();
         private Dictionary<WebView2, System.Text.StringBuilder> _notesChunks = new();
         private int _nextGroupId = 1;
@@ -27,6 +31,9 @@ namespace atsukibrowser
         private string _urlCapturas = "";
         private string _urlDocs = "";
         private string _urlNotes = "";
+        private string _urlWallpapers = "";
+        private string _urlAyuda = "";
+        private string _urlDraw = "";
         private string _carpetaCapturas = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
         "AtsukiBrowser", "Capturas");
@@ -91,7 +98,7 @@ namespace atsukibrowser
         private DescargasManager _descargas = null!;
         private ExtensionesManager _extensiones = null!;
         private AtajosManager _atajos = null!;
-        private readonly string _urlNuevaTab;
+        private string _urlNuevaTab;
         private readonly string _urlHistorial;
         private readonly string _urlFavoritos;
         private readonly string _urlAjustes;
@@ -206,6 +213,7 @@ namespace atsukibrowser
                     }),
                     handledEventsToo: true
                 );
+                CargarGrupos();
             };
             StateChanged += (s, e) =>
             {
@@ -214,7 +222,11 @@ namespace atsukibrowser
                     : new Thickness(0);
             };
             string res = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources");
-            _urlNuevaTab  = "file:///" + Path.Combine(res, "NuevaTab.html").Replace("\\", "/");
+            string _resNuevaTabV1 = "file:///" + Path.Combine(res, "NuevaTab.html").Replace("\\", "/");
+            string _resNuevaTabV2 = "file:///" + Path.Combine(res, "NuevaTabV2.html").Replace("\\", "/");
+            string _layoutPath    = Path.Combine(_carpetaPerfil, "nuevatab_layout.txt");
+            string _layoutVal     = File.Exists(_layoutPath) ? File.ReadAllText(_layoutPath).Trim() : "v1";
+            _urlNuevaTab = _layoutVal == "v2" ? _resNuevaTabV2 : _resNuevaTabV1;
             _urlHistorial = "file:///" + Path.Combine(res, "Historial.html").Replace("\\", "/");
             _urlFavoritos = "file:///" + Path.Combine(res, "Favoritos.html").Replace("\\", "/");
             _urlAjustes   = "file:///" + Path.Combine(res, "Ajustes.html").Replace("\\", "/");
@@ -223,6 +235,8 @@ namespace atsukibrowser
             _urlPerfiles = "file:///" + Path.Combine(res, "Perfiles.html").Replace("\\", "/");
             _urlCapturas = "file:///" + Path.Combine(res, "Capturas.html").Replace("\\", "/");
             _urlNotes = "file:///" + Path.Combine(res, "AtsukiNotes.html").Replace("\\", "/");
+            _urlAyuda = "file:///" + Path.Combine(res, "Ayuda.html").Replace("\\", "/");
+            _urlDraw = "file:///" + Path.Combine(res, "AtsukiDraw.html").Replace("\\", "/");
             // Leer perfil desde argumento
             var args = Environment.GetCommandLineArgs();
             foreach (var arg in args)
@@ -1203,6 +1217,18 @@ namespace atsukibrowser
                 WindowState = WindowState == WindowState.Maximized
                     ? WindowState.Normal
                     : WindowState.Maximized;
+            }
+        }
+
+        private static void CopiarCarpetaExt(string origen, string destino)
+        {
+            foreach (var file in Directory.GetFiles(origen))
+                File.Copy(file, Path.Combine(destino, Path.GetFileName(file)), true);
+            foreach (var dir in Directory.GetDirectories(origen))
+            {
+                var sub = Path.Combine(destino, Path.GetFileName(dir));
+                Directory.CreateDirectory(sub);
+                CopiarCarpetaExt(dir, sub);
             }
         }
 

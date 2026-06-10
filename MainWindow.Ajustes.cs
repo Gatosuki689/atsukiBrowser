@@ -138,6 +138,7 @@ namespace atsukibrowser
                 _extensiones = new ExtensionesManager(fallback);
                 _atajos      = new AtajosManager(fallback);
             }
+            string nuevatabLayoutPath = Path.Combine(_carpetaPerfil, "nuevatab_layout.txt");
         }
 
         private void CambiarPerfil(string id)

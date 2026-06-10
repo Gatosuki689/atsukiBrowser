@@ -328,36 +328,33 @@ namespace atsukibrowser
                 await InicializarMusicaWebView();
                 _musicaPanelAbierto = !_musicaPanelAbierto;
 
-                var anim = new System.Windows.Media.Animation.DoubleAnimation
+                double anchoBase = _sidebarCompacto ? 36 : 52;
+
+                // Detener animación activa antes de iniciar otra
+                SidebarColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
+
+                if (_musicaPanelAbierto)
+                    MusicaPanel.Visibility = Visibility.Visible;
+
+                var anim = new GridLengthAnimation
                 {
-                    From     = _musicaPanelAbierto ? 52 : 332,
-                    To       = _musicaPanelAbierto ? 332 : 52,
-                    Duration = TimeSpan.FromMilliseconds(180),
+                    From = new GridLength(SidebarColumn.Width.Value),
+                    To   = new GridLength(_musicaPanelAbierto ? 332 : anchoBase),
+                    Duration = TimeSpan.FromMilliseconds(200),
                     EasingFunction = new System.Windows.Media.Animation.CubicEase
                         { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
                 };
 
-                // Mostrar el panel antes de animar si se está abriendo
-                if (_musicaPanelAbierto)
-                    MusicaPanel.Visibility = Visibility.Visible;
-
                 anim.Completed += (_, _) =>
                 {
-                    // Ocultar al terminar si se está cerrando
+                    // Liberar la animación y fijar el valor final manualmente
+                    SidebarColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
+                    SidebarColumn.Width = new GridLength(_musicaPanelAbierto ? 332 : anchoBase);
                     if (!_musicaPanelAbierto)
                         MusicaPanel.Visibility = Visibility.Collapsed;
                 };
 
-                var col = SidebarColumn;
-                col.BeginAnimation(ColumnDefinition.WidthProperty,
-                    new GridLengthAnimation
-                    {
-                        From = new GridLength(_musicaPanelAbierto ? 52 : 332),
-                        To   = new GridLength(_musicaPanelAbierto ? 332 : 52),
-                        Duration = TimeSpan.FromMilliseconds(200),
-                        EasingFunction = new System.Windows.Media.Animation.CubicEase
-                            { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
-                    });
+                SidebarColumn.BeginAnimation(ColumnDefinition.WidthProperty, anim);
             };
             SidebarTop.Children.Add(btnMusica);
             // Widget de rendimiento al final
@@ -750,12 +747,14 @@ namespace atsukibrowser
 
         private void AplicarModoCompactoSidebar()
         {
-            // Columna principal del grid (controla ancho total del sidebar)
-            SidebarColumn.Width = new GridLength(_sidebarCompacto ? 36 : 52);
+            double anchoBase = _sidebarCompacto ? 36 : 52;
 
-            // Columna interna del sidebar
+            // Detener cualquier animación activa antes de asignar
+            SidebarColumn.BeginAnimation(ColumnDefinition.WidthProperty, null);
+            SidebarColumn.Width = new GridLength(_musicaPanelAbierto ? 332 : anchoBase);
+
             if (Sidebar.Child is Grid g && g.ColumnDefinitions.Count > 0)
-                g.ColumnDefinitions[0].Width = new GridLength(_sidebarCompacto ? 36 : 52);
+                g.ColumnDefinitions[0].Width = new GridLength(anchoBase);
 
             RenderizarSidebar();
 

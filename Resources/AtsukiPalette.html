@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<title>AtsukiPalette</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --accent: #7c3aed;
+  --accent2: #a78bfa;
+  --bg: #0d0d14;
+  --surface: #13131f;
+  --surface2: #1a1a2e;
+  --border: rgba(124,58,237,0.2);
+  --text: rgba(255,255,255,0.85);
+  --muted: rgba(255,255,255,0.35);
+}
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── TOPBAR ── */
+#topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+  height: 52px;
+  background: #0a0a10;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+#app-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+#app-title span { color: var(--accent2); }
+.tb-btn {
+  background: rgba(124,58,237,0.1);
+  border: 1px solid var(--border);
+  color: var(--accent2);
+  padding: 0 14px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: 'Segoe UI', sans-serif;
+  transition: all 0.15s;
+}
+.tb-btn:hover { background: rgba(124,58,237,0.22); }
+
+/* ── BODY ── */
+#body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* ── SIDEBAR ── */
+#sidebar {
+  width: 200px;
+  background: #0a0a10;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 12px 8px;
+  gap: 2px;
+}
+#sidebar::-webkit-scrollbar { width: 4px; }
+#sidebar::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 2px; }
+
+.sidebar-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  padding: 8px 8px 4px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+.nav-item:hover { background: var(--surface); color: var(--text); }
+.nav-item.active {
+  background: rgba(124,58,237,0.12);
+  border-color: rgba(124,58,237,0.25);
+  color: var(--accent2);
+}
+.nav-icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+
+/* ── CONTENT ── */
+#content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px;
+}
+#content::-webkit-scrollbar { width: 6px; }
+#content::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.3); border-radius: 3px; }
+
+.page { display: none; }
+.page.activa { display: block; }
+
+.page-title {
+  font-size: 20px;
+  font-weight: 300;
+  color: white;
+  margin-bottom: 6px;
+}
+.page-title span { color: var(--accent2); }
+.page-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 28px;
+  line-height: 1.6;
+}
+
+/* ── GENERADOR ── */
+#gen-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+#gen-color-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+}
+#gen-color {
+  width: 32px; height: 32px;
+  border: none; border-radius: 6px;
+  cursor: pointer; padding: 0;
+  background: none;
+}
+#gen-hex {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font-size: 13px;
+  font-family: 'Consolas', monospace;
+  width: 80px;
+}
+.chip-group { display: flex; gap: 4px; flex-wrap: wrap; }
+.chip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: 'Segoe UI', sans-serif;
+}
+.chip:hover { color: var(--text); border-color: rgba(124,58,237,0.4); }
+.chip.active {
+  background: rgba(124,58,237,0.2);
+  border-color: rgba(124,58,237,0.5);
+  color: var(--accent2);
+}
+
+/* ── PALETA ── */
+.palette-wrap {
+  display: flex;
+  gap: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  height: 120px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.palette-swatch {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  padding-bottom: 10px;
+  cursor: pointer;
+  position: relative;
+  transition: flex 0.2s;
+}
+.palette-swatch:hover { flex: 1.5; }
+.swatch-info {
+  opacity: 0;
+  transition: opacity 0.15s;
+  text-align: center;
+}
+.palette-swatch:hover .swatch-info { opacity: 1; }
+.swatch-hex {
+  font-size: 10px;
+  color: rgba(255,255,255,0.9);
+  font-family: 'Consolas', monospace;
+  background: rgba(0,0,0,0.4);
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+.swatch-copy {
+  font-size: 9px;
+  color: rgba(255,255,255,0.6);
+  margin-top: 3px;
+}
+
+/* ── PALETA ACCIONES ── */
+.palette-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 32px;
+  align-items: center;
+}
+.pal-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: 'Segoe UI', sans-serif;
+  transition: all 0.15s;
+  display: flex; align-items: center; gap: 6px;
+}
+.pal-btn:hover { color: var(--text); border-color: rgba(124,58,237,0.4); }
+.pal-btn.accent { background: rgba(124,58,237,0.1); color: var(--accent2); border-color: rgba(124,58,237,0.3); }
+.pal-btn.accent:hover { background: rgba(124,58,237,0.2); }
+
+/* ── DETALLE COLORES ── */
+.colors-detail {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+.color-detail-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  width: 140px;
+  transition: border-color 0.15s;
+}
+.color-detail-card:hover { border-color: rgba(124,58,237,0.4); }
+.color-detail-preview {
+  height: 64px;
+  width: 100%;
+}
+.color-detail-info {
+  padding: 10px 12px;
+}
+.color-detail-hex {
+  font-size: 12px;
+  font-family: 'Consolas', monospace;
+  color: white;
+  margin-bottom: 4px;
+}
+.color-detail-vals {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.color-copy-btns {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.copy-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 9px;
+  font-family: 'Consolas', monospace;
+  transition: all 0.15s;
+}
+.copy-btn:hover { color: var(--accent2); border-color: rgba(124,58,237,0.4); }
+
+/* ── PREVIEW UI ── */
+#ui-preview {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin-bottom: 28px;
+}
+#ui-preview-bar {
+  height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 8px;
+}
+#ui-preview-body {
+  padding: 20px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.preview-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-family: 'Segoe UI', sans-serif;
+  border: none;
+  cursor: default;
+}
+.preview-card {
+  padding: 14px 16px;
+  border-radius: 8px;
+  font-size: 12px;
+  min-width: 140px;
+}
+
+/* ── GRID PREDEFINIDAS ── */
+.palettes-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.preset-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.preset-card:hover {
+  border-color: rgba(124,58,237,0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+}
+.preset-swatches {
+  display: flex;
+  height: 72px;
+}
+.preset-swatch { flex: 1; }
+.preset-info {
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.preset-name { font-size: 12px; color: var(--text); }
+.preset-count { font-size: 10px; color: var(--muted); }
+
+/* ── FAVORITOS ── */
+.fav-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ── TOAST ── */
+#toast {
+  position: fixed;
+  bottom: 24px; left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 12px;
+  opacity: 0;
+  transition: all 0.25s;
+  z-index: 1000;
+  pointer-events: none;
+}
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <button class="tb-btn" id="btn-back">←</button>
+  <div id="app-title">Atsuki<span>Palette</span></div>
+</div>
+
+<div id="body">
+  <div id="sidebar">
+    <div class="sidebar-label">Herramientas</div>
+    <div class="nav-item active" data-page="generador">
+      <span class="nav-icon">🎨</span> Generador
+    </div>
+    <div class="nav-item" data-page="predefinidas">
+      <span class="nav-icon">📚</span> Predefinidas
+    </div>
+    <div class="nav-item" data-page="favoritos">
+      <span class="nav-icon">⭐</span> Favoritos
+    </div>
+  </div>
+
+  <div id="content">
+
+    <!-- GENERADOR -->
+    <div class="page activa" id="page-generador">
+      <div class="page-title">Generador de <span>paletas</span></div>
+      <p class="page-sub">Elige un color base y genera una paleta armoniosa automáticamente.</p>
+
+      <div id="gen-controls">
+        <div id="gen-color-wrap">
+          <input type="color" id="gen-color" value="#7c3aed"/>
+          <input type="text"  id="gen-hex"   value="#7c3aed" maxlength="7"/>
+        </div>
+        <div class="chip-group" id="chips-modo">
+          <button class="chip active" data-modo="complementario">Complementario</button>
+          <button class="chip" data-modo="analogo">Análogo</button>
+          <button class="chip" data-modo="triadico">Triádico</button>
+          <button class="chip" data-modo="tetraedico">Tetraédico</button>
+          <button class="chip" data-modo="monocromatico">Monocromático</button>
+          <button class="chip" data-modo="dividido">Dividido</button>
+        </div>
+      </div>
+
+      <div class="palette-wrap" id="gen-palette"></div>
+      <div class="palette-actions">
+        <button class="pal-btn accent" id="btn-guardar-pal">⭐ Guardar en favoritos</button>
+        <button class="pal-btn" id="btn-copiar-css">{ } Copiar CSS vars</button>
+        <button class="pal-btn" id="btn-copiar-json">[ ] Copiar JSON</button>
+        <button class="pal-btn" id="btn-aplicar-tema">🎨 Aplicar como tema</button>
+        <span id="pal-label" style="font-size:11px;color:var(--muted);margin-left:auto"></span>
+      </div>
+
+      <div class="colors-detail" id="gen-detail"></div>
+
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:12px">Vista previa</div>
+      <div id="ui-preview">
+        <div id="ui-preview-bar">
+          <div style="width:10px;height:10px;border-radius:50%" id="pv-dot1"></div>
+          <div style="flex:1;height:6px;border-radius:3px;opacity:0.3" id="pv-bar"></div>
+        </div>
+        <div id="ui-preview-body">
+          <button class="preview-btn" id="pv-btn1">Acción primaria</button>
+          <button class="preview-btn" id="pv-btn2">Secundario</button>
+          <div class="preview-card" id="pv-card1">
+            <div style="font-size:12px;font-weight:600;margin-bottom:4px" id="pv-card-title">Tarjeta</div>
+            <div style="font-size:11px;opacity:0.6">Texto de ejemplo en la paleta actual.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PREDEFINIDAS -->
+    <div class="page" id="page-predefinidas">
+      <div class="page-title">Paletas <span>predefinidas</span></div>
+      <p class="page-sub">Colecciones curadas por categoría. Haz clic para cargar en el generador.</p>
+      <div class="chip-group" id="chips-cat" style="margin-bottom:20px"></div>
+      <div class="palettes-grid" id="presets-grid"></div>
+    </div>
+
+    <!-- FAVORITOS -->
+    <div class="page" id="page-favoritos">
+      <div class="page-title">Paletas <span>guardadas</span></div>
+      <p class="page-sub">Tus paletas favoritas guardadas localmente.</p>
+      <div class="palettes-grid" id="favs-grid"></div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  DATOS — PALETAS PREDEFINIDAS
+// ═══════════════════════════════════════════════
+const PRESETS = [
+  { nombre: 'Aurora Boreal',   cat: 'naturaleza', colores: ['#00c9ff','#92effd','#a8ff78','#78ffd6','#00b4db'] },
+  { nombre: 'Atardecer',       cat: 'naturaleza', colores: ['#ff6b6b','#feca57','#ff9f43','#ee5a24','#c0392b'] },
+  { nombre: 'Bosque Profundo', cat: 'naturaleza', colores: ['#2d6a4f','#40916c','#74c69d','#b7e4c7','#d8f3dc'] },
+  { nombre: 'Océano',          cat: 'naturaleza', colores: ['#03045e','#0077b6','#00b4d8','#90e0ef','#caf0f8'] },
+  { nombre: 'Lavanda',         cat: 'pastel',     colores: ['#e8d5f5','#c9b8e8','#a89ac8','#8a7fb5','#6b5fa0'] },
+  { nombre: 'Melocotón',       cat: 'pastel',     colores: ['#ffecd2','#fcb69f','#ff9a9e','#fecfef','#ffecd2'] },
+  { nombre: 'Menta',           cat: 'pastel',     colores: ['#d4f1f4','#75e6da','#189ab4','#05445e','#a8d8ea'] },
+  { nombre: 'Nubes',           cat: 'pastel',     colores: ['#f8f9fa','#e9ecef','#dee2e6','#ced4da','#adb5bd'] },
+  { nombre: 'Cyberpunk',       cat: 'neon',       colores: ['#ff0090','#00d4ff','#ffff00','#7b2fff','#00ff88'] },
+  { nombre: 'Neón City',       cat: 'neon',       colores: ['#f72585','#7209b7','#3a0ca3','#4361ee','#4cc9f0'] },
+  { nombre: 'Matrix',          cat: 'neon',       colores: ['#00ff41','#008f11','#003b00','#0d0208','#39ff14'] },
+  { nombre: 'Synthwave',       cat: 'neon',       colores: ['#ff6ec7','#a855f7','#6366f1','#06b6d4','#f59e0b'] },
+  { nombre: 'Tierra',          cat: 'tierra',     colores: ['#6b4c11','#a0522d','#cd853f','#deb887','#f5deb3'] },
+  { nombre: 'Arena',           cat: 'tierra',     colores: ['#c9a96e','#b8860b','#daa520','#f4a460','#ffd700'] },
+  { nombre: 'Arcilla',         cat: 'tierra',     colores: ['#8b4513','#a0522d','#bc8a5f','#d4a574','#e8c99a'] },
+  { nombre: 'Pizarra',         cat: 'tierra',     colores: ['#2f3542','#57606f','#747d8c','#a4b0be','#dfe4ea'] },
+  { nombre: 'Midnight',        cat: 'oscuro',     colores: ['#0d0d14','#13131f','#1a1a2e','#16213e','#0f3460'] },
+  { nombre: 'Obsidian',        cat: 'oscuro',     colores: ['#1a1a2e','#16213e','#0f3460','#533483','#e94560'] },
+  { nombre: 'Carvon',          cat: 'oscuro',     colores: ['#000000','#1a1a1a','#333333','#4d4d4d','#666666'] },
+  { nombre: 'Dracula',         cat: 'oscuro',     colores: ['#282a36','#44475a','#6272a4','#bd93f9','#ff79c6'] },
+  { nombre: 'Coral',           cat: 'vibrante',   colores: ['#ff6b6b','#ff8e53','#fe3c72','#f7971e','#ffd200'] },
+  { nombre: 'Tropical',        cat: 'vibrante',   colores: ['#00b09b','#96c93d','#f7971e','#ffd200','#2af598'] },
+  { nombre: 'Berry',           cat: 'vibrante',   colores: ['#9b59b6','#8e44ad','#6c3483','#d7bde2','#e8daef'] },
+  { nombre: 'Fuego',           cat: 'vibrante',   colores: ['#f12711','#f5af19','#f7971e','#ffd200','#e55d87'] },
+];
+
+const CATS = ['todos', 'naturaleza', 'pastel', 'neon', 'tierra', 'oscuro', 'vibrante'];
+
+// ═══════════════════════════════════════════════
+//  ESTADO
+// ═══════════════════════════════════════════════
+let colorBase   = '#7c3aed';
+let modoActual  = 'complementario';
+let paletaActual = [];
+let favoritos   = JSON.parse(localStorage.getItem('palette_favs') ?? '[]');
+let catActual   = 'todos';
+
+// ═══════════════════════════════════════════════
+//  UTILIDADES DE COLOR
+// ═══════════════════════════════════════════════
+function hexToHsl(hex) {
+  let r = parseInt(hex.slice(1,3),16)/255;
+  let g = parseInt(hex.slice(3,5),16)/255;
+  let b = parseInt(hex.slice(5,7),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  let h, s, l = (max+min)/2;
+  if (max === min) { h = s = 0; }
+  else {
+    const d = max - min;
+    s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+    switch(max) {
+      case r: h = ((g-b)/d + (g<b?6:0))/6; break;
+      case g: h = ((b-r)/d + 2)/6; break;
+      case b: h = ((r-g)/d + 4)/6; break;
+    }
+  }
+  return [Math.round(h*360), Math.round(s*100), Math.round(l*100)];
+}
+
+function hslToHex(h, s, l) {
+  s /= 100; l /= 100;
+  const a = s * Math.min(l, 1-l);
+  const f = n => {
+    const k = (n + h/30) % 12;
+    const c = l - a * Math.max(Math.min(k-3, 9-k, 1), -1);
+    return Math.round(255*c).toString(16).padStart(2,'0');
+  };
+  return '#' + f(0) + f(8) + f(4);
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r, g, b];
+}
+
+function generarPaleta(hex, modo) {
+  const [h, s, l] = hexToHsl(hex);
+  switch (modo) {
+    case 'complementario':
+      return [hex, hslToHex((h+30)%360,s,l), hslToHex((h+60)%360,s,l),
+              hslToHex((h+180)%360,s,l), hslToHex((h+210)%360,s,l)];
+    case 'analogo':
+      return [hslToHex((h-40+360)%360,s,l), hslToHex((h-20+360)%360,s,l),
+              hex, hslToHex((h+20)%360,s,l), hslToHex((h+40)%360,s,l)];
+    case 'triadico':
+      return [hex, hslToHex((h+60)%360,s,l), hslToHex((h+120)%360,s,l),
+              hslToHex((h+180)%360,s,l), hslToHex((h+240)%360,s,l)];
+    case 'tetraedico':
+      return [hex, hslToHex((h+90)%360,s,l),
+              hslToHex((h+180)%360,s,l), hslToHex((h+270)%360,s,l),
+              hslToHex((h+45)%360, s, Math.min(90,l+10))];
+    case 'monocromatico':
+      return [hslToHex(h,s,Math.max(10,l-30)), hslToHex(h,s,Math.max(10,l-15)),
+              hex, hslToHex(h,s,Math.min(90,l+15)), hslToHex(h,s,Math.min(90,l+30))];
+    case 'dividido':
+      return [hex, hslToHex((h+150)%360,s,l), hslToHex((h+210)%360,s,l),
+              hslToHex((h+30)%360,s,Math.min(90,l+10)), hslToHex((h+330)%360,s,Math.min(90,l+10))];
+    default: return [hex];
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER PALETA
+// ═══════════════════════════════════════════════
+function renderPaleta(colores) {
+  paletaActual = colores;
+
+  // Barra de swatches
+  const wrap = document.getElementById('gen-palette');
+  wrap.innerHTML = '';
+  colores.forEach(c => {
+    const sw = document.createElement('div');
+    sw.className = 'palette-swatch';
+    sw.style.background = c;
+    sw.innerHTML = `
+      <div class="swatch-info">
+        <div class="swatch-hex">${c.toUpperCase()}</div>
+        <div class="swatch-copy">Clic para copiar</div>
+      </div>
+    `;
+    sw.addEventListener('click', () => { copiar(c.toUpperCase()); });
+    wrap.appendChild(sw);
+  });
+
+  // Detalle de colores
+  const detail = document.getElementById('gen-detail');
+  detail.innerHTML = '';
+  colores.forEach(c => {
+    const [h,s,l] = hexToHsl(c);
+    const [r,g,b] = hexToRgb(c);
+    const card = document.createElement('div');
+    card.className = 'color-detail-card';
+    card.innerHTML = `
+      <div class="color-detail-preview" style="background:${c}"></div>
+      <div class="color-detail-info">
+        <div class="color-detail-hex">${c.toUpperCase()}</div>
+        <div class="color-detail-vals">
+          rgb(${r}, ${g}, ${b})<br>
+          hsl(${h}, ${s}%, ${l}%)
+        </div>
+        <div class="color-copy-btns">
+          <button class="copy-btn" onclick="copiar('${c.toUpperCase()}')">HEX</button>
+          <button class="copy-btn" onclick="copiar('rgb(${r},${g},${b})')">RGB</button>
+          <button class="copy-btn" onclick="copiar('hsl(${h},${s}%,${l}%)')">HSL</button>
+        </div>
+      </div>
+    `;
+    detail.appendChild(card);
+  });
+
+  // Preview UI
+  actualizarPreview(colores);
+}
+
+function actualizarPreview(colores) {
+  const [c0, c1, c2, c3, c4] = colores;
+  document.getElementById('ui-preview-bar').style.background = c0 + '22';
+  document.getElementById('pv-dot1').style.background = c0;
+  document.getElementById('pv-bar').style.background  = c1;
+  document.getElementById('pv-btn1').style.cssText = `background:${c0};color:white;padding:8px 16px;border-radius:6px;border:none;font-size:12px;font-family:'Segoe UI',sans-serif;cursor:default`;
+  document.getElementById('pv-btn2').style.cssText = `background:transparent;color:${c1};border:1px solid ${c1};padding:8px 16px;border-radius:6px;font-size:12px;font-family:'Segoe UI',sans-serif;cursor:default`;
+  document.getElementById('pv-card1').style.cssText = `background:${c2}22;border:1px solid ${c2}44;padding:14px 16px;border-radius:8px;min-width:140px;color:var(--text)`;
+  document.getElementById('pv-card-title').style.color = c1;
+  document.getElementById('ui-preview-body').style.background = c0 + '11';
+}
+
+// ═══════════════════════════════════════════════
+//  PALETAS PREDEFINIDAS
+// ═══════════════════════════════════════════════
+function renderPresets() {
+  // Chips de categoría
+  const chipsEl = document.getElementById('chips-cat');
+  chipsEl.innerHTML = '';
+  CATS.forEach(cat => {
+    const chip = document.createElement('button');
+    chip.className = 'chip' + (cat === catActual ? ' active' : '');
+    chip.textContent = cat.charAt(0).toUpperCase() + cat.slice(1);
+    chip.addEventListener('click', () => {
+      catActual = cat;
+      renderPresets();
+    });
+    chipsEl.appendChild(chip);
+  });
+
+  // Grid
+  const grid = document.getElementById('presets-grid');
+  grid.innerHTML = '';
+  const filtradas = catActual === 'todos' ? PRESETS : PRESETS.filter(p => p.cat === catActual);
+
+  filtradas.forEach(preset => {
+    const card = document.createElement('div');
+    card.className = 'preset-card';
+    const swatches = preset.colores.map(c =>
+      `<div class="preset-swatch" style="background:${c}"></div>`).join('');
+    card.innerHTML = `
+      <div class="preset-swatches">${swatches}</div>
+      <div class="preset-info">
+        <span class="preset-name">${preset.nombre}</span>
+        <span class="preset-count">${preset.colores.length} colores</span>
+      </div>
+    `;
+    card.addEventListener('click', () => {
+      // Cargar en generador
+      mostrarPagina('generador');
+      renderPaleta(preset.colores);
+      paletaActual = preset.colores;
+      document.getElementById('pal-label').textContent = preset.nombre;
+    });
+    grid.appendChild(card);
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  FAVORITOS
+// ═══════════════════════════════════════════════
+function renderFavoritos() {
+  const grid = document.getElementById('favs-grid');
+  grid.innerHTML = '';
+
+  if (favoritos.length === 0) {
+    grid.innerHTML = '<div class="fav-empty">⭐<br><br>No tienes paletas guardadas.<br>Genera una y guárdala en favoritos.</div>';
+    return;
+  }
+
+  favoritos.forEach((fav, idx) => {
+    const card = document.createElement('div');
+    card.className = 'preset-card';
+    const swatches = fav.colores.map(c =>
+      `<div class="preset-swatch" style="background:${c}"></div>`).join('');
+    card.innerHTML = `
+      <div class="preset-swatches">${swatches}</div>
+      <div class="preset-info">
+        <span class="preset-name">${fav.nombre}</span>
+        <button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;padding:2px 6px;border-radius:4px;transition:color 0.15s"
+          onmouseover="this.style.color='#ef4444'" onmouseout="this.style.color='var(--muted)'"
+          onclick="eliminarFavorito(${idx});event.stopPropagation()">✕</button>
+      </div>
+    `;
+    card.addEventListener('click', () => {
+      mostrarPagina('generador');
+      renderPaleta(fav.colores);
+      document.getElementById('pal-label').textContent = fav.nombre;
+    });
+    grid.appendChild(card);
+  });
+}
+
+function eliminarFavorito(idx) {
+  favoritos.splice(idx, 1);
+  localStorage.setItem('palette_favs', JSON.stringify(favoritos));
+  renderFavoritos();
+  toast('Paleta eliminada');
+}
+
+// ═══════════════════════════════════════════════
+//  NAVEGACIÓN
+// ═══════════════════════════════════════════════
+function mostrarPagina(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('activa'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id)?.classList.add('activa');
+  document.querySelector(`[data-page="${id}"]`)?.classList.add('active');
+
+  if (id === 'predefinidas') renderPresets();
+  if (id === 'favoritos')    renderFavoritos();
+}
+
+document.querySelectorAll('.nav-item').forEach(item => {
+  item.addEventListener('click', () => mostrarPagina(item.dataset.page));
+});
+
+// ═══════════════════════════════════════════════
+//  CONTROLES GENERADOR
+// ═══════════════════════════════════════════════
+document.getElementById('gen-color').addEventListener('input', e => {
+  colorBase = e.target.value;
+  document.getElementById('gen-hex').value = colorBase;
+  renderPaleta(generarPaleta(colorBase, modoActual));
+});
+
+document.getElementById('gen-hex').addEventListener('input', e => {
+  const val = e.target.value;
+  if (/^#[0-9a-fA-F]{6}$/.test(val)) {
+    colorBase = val;
+    document.getElementById('gen-color').value = colorBase;
+    renderPaleta(generarPaleta(colorBase, modoActual));
+  }
+});
+
+document.querySelectorAll('#chips-modo .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#chips-modo .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    modoActual = chip.dataset.modo;
+    renderPaleta(generarPaleta(colorBase, modoActual));
+  });
+});
+
+// ═══════════════════════════════════════════════
+//  ACCIONES PALETA
+// ═══════════════════════════════════════════════
+document.getElementById('btn-guardar-pal').addEventListener('click', () => {
+  if (paletaActual.length === 0) return;
+  const nombre = prompt('Nombre para la paleta:', `Paleta ${favoritos.length + 1}`);
+  if (!nombre) return;
+  favoritos.push({ nombre, colores: paletaActual });
+  localStorage.setItem('palette_favs', JSON.stringify(favoritos));
+  toast('⭐ Paleta guardada');
+});
+
+document.getElementById('btn-copiar-css').addEventListener('click', () => {
+  if (paletaActual.length === 0) return;
+  const css = paletaActual.map((c,i) => `  --color-${i+1}: ${c};`).join('\n');
+  copiar(`:root {\n${css}\n}`);
+});
+
+document.getElementById('btn-copiar-json').addEventListener('click', () => {
+  if (paletaActual.length === 0) return;
+  copiar(JSON.stringify(paletaActual, null, 2));
+});
+
+document.getElementById('btn-aplicar-tema').addEventListener('click', () => {
+  if (paletaActual.length < 1) return;
+  window.chrome.webview.postMessage('palette:aplicar-tema:' + JSON.stringify({
+    accent: paletaActual[0]
+  }));
+  toast('🎨 Acento aplicado como tema');
+});
+
+// ═══════════════════════════════════════════════
+//  UTILIDADES
+// ═══════════════════════════════════════════════
+function copiar(texto) {
+  navigator.clipboard.writeText(texto).then(() => toast('✓ Copiado'));
+}
+
+function toast(msg, dur = 2200) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur);
+}
+
+function aplicarTema(t) {
+  const r = document.documentElement;
+  const hex = t.Accent ?? t.accent ?? '#7c3aed';
+  r.style.setProperty('--accent', hex);
+  r.style.setProperty('--bg',      t.Bg      ?? t.bg      ?? '#0d0d14');
+  r.style.setProperty('--surface', t.Surface ?? t.surface ?? '#13131f');
+  r.style.setProperty('--surface2',t.Surface2 ?? t.surface2 ?? '#1a1a2e');
+  const hx = hex.replace('#','');
+  const rr = parseInt(hx.slice(0,2),16);
+  const gg = parseInt(hx.slice(2,4),16);
+  const bb = parseInt(hx.slice(4,6),16);
+  r.style.setProperty('--border', `rgba(${rr},${gg},${bb},0.2)`);
+  r.style.setProperty('--accent2', hex);
+}
+
+window.chrome?.webview?.addEventListener('message', e => {
+  const raw = e.data;
+  if (typeof raw !== 'string') return;
+  if (raw.startsWith('tema:')) aplicarTema(JSON.parse(raw.slice('tema:'.length)));
+});
+
+document.getElementById('btn-back').addEventListener('click', () =>
+  window.chrome.webview.postMessage('navigate:nuevatab'));
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+window.chrome?.webview?.postMessage('get:tema');
+renderPaleta(generarPaleta(colorBase, modoActual));
+</script>
+</body>
+</html>

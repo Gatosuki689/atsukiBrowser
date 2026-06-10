@@ -429,6 +429,10 @@ const quill = new Quill('#quill-editor', {
   }
 });
 
+window.addEventListener('error', e => {
+    alert('ERROR JS: ' + e.message + ' en ' + e.filename + ':' + e.lineno);
+});
+
 // Detectar cambios → marcar como no guardado
 quill.on('text-change', () => {
   const doc = docActivo();
@@ -605,12 +609,6 @@ function renderRecientes() {
     lista.appendChild(item);
   }
 }
-
-console.log('LISTENERS INIT');
-  document.getElementById('btn-abrir').addEventListener('click', () => {
-    console.log('btn-abrir clicked');
-    window.chrome.webview.postMessage('docs:abrir');
-  });
 
 // ═══════════════════════════════════════════════
 //  LISTENERS BOTONES
